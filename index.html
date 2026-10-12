@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LOOP — The Fabric Future</title>
+  <meta name="description" content="LOOP is a robotic, AI-powered laundry brand. Premium fabric care with low water and low energy — launching in Mumbai, Pune, Dubai and Singapore.">
+  <meta name="theme-color" content="#0b0b0b">
+  <meta property="og:title" content="LOOP — The Fabric Future">
+  <meta property="og:description" content="The robotic laundry revolution. Launching soon.">
+  <meta property="og:image" content="assets/launch-post.jpg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Jost:wght@200;300;400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <noscript><style>.preloader{display:none}body.is-loading{overflow:auto}.split .w>span,.reveal{transform:none;opacity:1}</style></noscript>
+</head>
+<body class="is-loading">
+
+  <!-- Preloader: mirrors the app splash -->
+  <div class="preloader" aria-hidden="true">
+    <div class="preloader__mark" data-logo="o"></div>
+    <div class="preloader__bar"><span></span></div>
+    <div class="preloader__meta"><span>Initialising loop</span><span class="preloader__pct">000</span></div>
+  </div>
+
+  <div class="cursor" aria-hidden="true"><span></span></div>
+  <div class="grain" aria-hidden="true"></div>
+
+  <!-- Announcement -->
+  <div class="announce" data-show="announcement.show">
+    <span class="announce__dot"></span>
+    <span data-c="announcement.text"></span>
+    <a data-href="announcement.link" data-c="announcement.linkLabel"></a>
+  </div>
+
+  <!-- Header -->
+  <header class="nav">
+    <a href="#top" class="nav__logo" aria-label="LOOP home" data-logo="word"></a>
+    <nav class="nav__links" aria-label="Main">
+      <a href="#cycle">The Loop</a>
+      <a href="#services">Services</a>
+      <a href="#franchise">Franchise</a>
+      <a href="#updates">Updates</a>
+      <a href="#contact">Contact</a>
+    </nav>
+    <a href="#contact" class="btn btn--small magnetic">Early access</a>
+    <button class="nav__burger" aria-label="Open menu" aria-expanded="false"><span></span><span></span></button>
+  </header>
+
+  <div class="menu" aria-hidden="true">
+    <a href="#cycle">The Loop</a>
+    <a href="#services">Services</a>
+    <a href="#franchise">Franchise</a>
+    <a href="#updates">Updates</a>
+    <a href="#contact">Contact</a>
+  </div>
+
+  <main id="top">
+
+    <!-- HERO -->
+    <section class="hero">
+      <canvas class="hero__fabric" aria-hidden="true"></canvas>
+      <div class="hero__hud hero__hud--tl mono"><span class="dot"></span> SYS / ONLINE</div>
+      <div class="hero__hud hero__hud--tr mono">19.0760° N &nbsp; 72.8777° E</div>
+
+      <div class="hero__inner">
+        <p class="eyebrow hero__eyebrow" data-c="hero.eyebrow"></p>
+        <h1 class="hero__logo" aria-label="LOOP — The Fabric Future">
+          <span data-logo="hero"></span>
+        </h1>
+        <p class="hero__tagline" data-c="hero.tagline"></p>
+      </div>
+
+      <div class="hero__foot">
+        <div class="hero__copy">
+          <h2 class="hero__headline split" data-c="hero.headline"></h2>
+          <p class="hero__sub" data-c="hero.sub"></p>
+        </div>
+        <div class="hero__ctas">
+          <a class="btn magnetic" data-href="hero.primary.href"><span data-c="hero.primary.label"></span><i>→</i></a>
+          <a class="btn btn--ghost magnetic" data-href="hero.secondary.href"><span data-c="hero.secondary.label"></span><i>→</i></a>
+        </div>
+      </div>
+
+      <div class="hero__scroll mono"><span>Scroll</span><i></i></div>
+    </section>
+
+    <!-- MARQUEE -->
+    <div class="marquee" aria-hidden="true"><div class="marquee__track"></div></div>
+
+    <!-- THE CYCLE (sticky morph) -->
+    <section class="cycle" id="cycle">
+      <div class="cycle__sticky">
+        <div class="cycle__text">
+          <p class="eyebrow" data-c="cycle.eyebrow"></p>
+          <h2 class="h2 split" data-c="cycle.title"></h2>
+          <ol class="cycle__steps"></ol>
+          <div class="cycle__progress"><span></span></div>
+        </div>
+        <div class="cycle__stage">
+          <svg viewBox="-220 -220 440 440" aria-hidden="true">
+            <g class="cycle__ticks"></g>
+            <path class="m m1"/><path class="m m2"/><path class="m m3"/><path class="m m4"/>
+          </svg>
+          <div class="cycle__num mono"><span class="cycle__idx">01</span><small>/ 04</small></div>
+          <div class="cycle__label mono"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- PILLARS -->
+    <section class="pillars">
+      <div class="wrap">
+        <p class="eyebrow">Why LOOP</p>
+        <h2 class="h2 split">Built like technology. Felt like care.</h2>
+        <div class="pillars__grid"></div>
+      </div>
+    </section>
+
+    <!-- STATS -->
+    <section class="stats">
+      <div class="wrap stats__grid"></div>
+    </section>
+
+    <!-- SERVICES -->
+    <section class="services" id="services">
+      <div class="wrap">
+        <div class="section-head">
+          <p class="eyebrow">Services</p>
+          <h2 class="h2 split">Every fabric has a program.</h2>
+        </div>
+        <ul class="services__list"></ul>
+      </div>
+    </section>
+
+    <!-- STORE -->
+    <section class="store">
+      <div class="store__sticky">
+        <figure class="store__frame">
+          <img class="store__img" data-src="store.image" alt="LOOP store concept: a black storefront with the glowing LOOP logo and robotic washing machines inside">
+        </figure>
+        <div class="store__caption">
+          <p class="eyebrow" data-c="store.eyebrow"></p>
+          <h2 class="h2" data-c="store.title"></h2>
+          <p data-c="store.text"></p>
+        </div>
+      </div>
+    </section>
+
+    <!-- FRANCHISE (light, brochure-style) -->
+    <section class="franchise" id="franchise">
+      <div class="wrap franchise__grid">
+        <div>
+          <p class="eyebrow" data-c="franchise.eyebrow"></p>
+          <h2 class="h2 split" data-c="franchise.title"></h2>
+          <p class="franchise__lead" data-c="franchise.text"></p>
+          <ul class="franchise__list"></ul>
+        </div>
+        <div class="franchise__panel">
+          <div class="figure">
+            <span class="mono">Investment</span>
+            <strong data-c="franchise.investment"></strong>
+          </div>
+          <div class="figure">
+            <span class="mono">Return on investment</span>
+            <strong data-c="franchise.roi"></strong>
+          </div>
+          <p class="franchise__note" data-c="franchise.note"></p>
+          <a class="btn btn--dark magnetic" data-href="franchise.cta.href"><span data-c="franchise.cta.label"></span><i>→</i></a>
+        </div>
+      </div>
+    </section>
+
+    <!-- UPDATES (client-managed feed) -->
+    <section class="updates" id="updates">
+      <div class="wrap">
+        <div class="section-head section-head--row">
+          <div>
+            <p class="eyebrow">Updates</p>
+            <h2 class="h2 split">News from the Loop.</h2>
+          </div>
+          <div class="updates__nav">
+            <button class="round" data-dir="-1" aria-label="Previous updates">←</button>
+            <button class="round" data-dir="1" aria-label="Next updates">→</button>
+          </div>
+        </div>
+      </div>
+      <div class="updates__rail"></div>
+    </section>
+
+    <!-- CONTACT -->
+    <section class="contact" id="contact">
+      <div class="wrap">
+        <h2 class="contact__title split" data-c="contact.title"></h2>
+        <div class="contact__grid">
+          <div class="contact__info">
+            <div><span class="mono">Call</span><div class="contact__phones"></div></div>
+            <div><span class="mono">Write</span><div class="contact__emails"></div></div>
+            <div><span class="mono">Follow</span><div class="contact__socials"></div></div>
+          </div>
+          <form class="contact__form" novalidate>
+            <label><span class="mono">Name</span><input name="name" required autocomplete="name"></label>
+            <label><span class="mono">Phone</span><input name="phone" type="tel" required autocomplete="tel"></label>
+            <label><span class="mono">City</span><input name="city" autocomplete="address-level2"></label>
+            <fieldset>
+              <legend class="mono">I'm interested in</legend>
+              <label class="chip"><input type="radio" name="topic" value="Early access" checked><span>Early access</span></label>
+              <label class="chip"><input type="radio" name="topic" value="Franchise"><span>Franchise</span></label>
+              <label class="chip"><input type="radio" name="topic" value="Business laundry"><span>Business laundry</span></label>
+            </fieldset>
+            <button class="btn magnetic" type="submit"><span>Send on WhatsApp</span><i>→</i></button>
+            <p class="contact__msg mono" role="status"></p>
+          </form>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="footer__logo" data-logo="word"></div>
+    <p class="footer__cities mono"></p>
+    <p class="footer__values mono"></p>
+    <p class="footer__line" data-c="footer.line"></p>
+  </footer>
+
+  <script src="js/content.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
