@@ -591,3 +591,25 @@ body:not(.is-loading) .preloader { clip-path: inset(0 0 100% 0); visibility: hid
   .city__line { stroke-dashoffset: 0; }
   .city__float, .city svg { animation: none; }
 }
+
+/* ---------- 3D layer (js/world3d.js; only when WebGL is available) ---------- */
+.world3d { position: fixed; top: 0; left: 0; pointer-events: none; }
+.world3d--bg { z-index: -1; }
+.world3d--fg { z-index: 50; }
+.has-3d .hero__fabric { display: none; }
+.has-3d .cycle__stage svg, .has-3d .pillar__icon svg { opacity: 0; }
+.has-3d .cycle__sticky { z-index: 51; }
+.has-3d .pillar, .has-3d .update, .has-3d .franchise__panel { transition: transform .5s var(--ease), border-color .4s; }
+.has-3d .pillar:hover, .has-3d .franchise__panel:hover {
+  transform: perspective(1000px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+}
+.has-3d .update:hover { --lift: -6px; transform: perspective(1000px) translateY(var(--lift)) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)); }
+.has-3d .store__sticky { perspective: 1400px; }
+.has-3d .store__frame { transform: rotateX(calc(var(--p-inv, 1) * 24deg)) translateZ(calc(var(--p-inv, 1) * -140px)); transform-origin: 50% 75%; }
+@media (prefers-reduced-motion: reduce) {
+  .has-3d .store__frame { transform: none; }
+}
+/* the 3D gyroscope (world3d.js) replaces the flat inner rings of the hero/finale second O */
+.has-3d [data-logo="hero"] .ro-inner { opacity: 0 !important; }
+/* the 3D handshake (world3d.js) replaces the flat scene in the first O */
+.has-3d [data-logo="hero"] .robot { display: none; }

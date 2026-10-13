@@ -349,6 +349,7 @@
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
     function draw(t) {
+      if (document.documentElement.classList.contains("has-3d")) return; // the 3D fabric (world3d.js) takes over
       ctx.clearRect(0, 0, cw, ch);
       mouse.x = lerp(mouse.x, mouse.tx, 0.08); mouse.y = lerp(mouse.y, mouse.ty, 0.08);
       const gap = cw < 700 ? 16 : 13, step = cw < 700 ? 14 : 10, R = 170;
