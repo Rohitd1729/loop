@@ -1,35 +1,35 @@
-# LOOP — landing page
+# LOOP — website
 
-Open `index.html` in a browser. No build step and no install needed.
+Live at https://rohitd1729.github.io/loop/ (GitHub Pages, free).
 
 ```
-index.html      page structure
-css/style.css   all styling (colour tokens at the top)
-js/content.js   ALL text, numbers, services and updates  ← edit this
-js/main.js      animations and rendering (no need to touch)
-assets/         images
+index.html            page structure
+css/style.css         styling
+js/main.js            animations + rendering
+js/content.js         fixed page text (hero, services, franchise, contact…)
+content/updates.json  updates + top announcement bar  ← the owner edits this from his phone
+.pages.yml            defines the owner's editor form (Pages CMS)
+assets/               images (owner uploads go to assets/uploads/)
 ```
 
-## Posting an update
+## How the owner posts an update (phone or tablet)
 
-1. Put the image in `assets/` (optional).
-2. Open `js/content.js` and find `updates: [`.
-3. Copy an existing `{ ... },` block, paste it at the top of the list and edit it:
+1. Open **https://app.pagescms.org** and sign in (email link — no GitHub account needed).
+2. Open **LOOP → Website updates**.
+3. Under **Updates**, tap **Add an entry**, then fill in title, date, category, photo, short summary
+   and (optional) full article.
+4. Tap **Save**. The site updates in about 1 minute.
 
-```js
-{
-  date: "2026-11-01",            // YYYY-MM-DD. Posts from the last 14 days get a "New" badge
-  tag: "Launch",
-  title: "Pune store is open",
-  text: "Walk in from 1 November, or book a pickup.",
-  image: "assets/pune-store.jpg" // optional
-},
-```
+He can also turn the **top announcement bar** on/off and change its text on the same screen.
+Updates are sorted by date automatically; posts from the last 14 days show a "New" badge.
 
-4. Save and refresh. The page sorts updates newest first on its own.
+## One-time setup (developer)
 
-Everything else works the same way: the top announcement bar, hero copy, services, stats, franchise figures, phone numbers, social links and cities are all in `content.js`.
+1. Sign in at https://app.pagescms.org with the GitHub account that owns the repo.
+2. Install the Pages CMS GitHub App when asked and give it access to the `loop` repo.
+3. Open the repo in Pages CMS → **Settings / Collaborators** → invite the owner's email.
 
-## Contact form
+## Preview locally
 
-The form opens a pre-filled WhatsApp chat to `contact.whatsapp`, so no server is needed.
+Updates are loaded with `fetch`, which browsers block when you double-click `index.html`.
+Run a tiny server instead, from this folder: `python -m http.server`, then open http://localhost:8000.

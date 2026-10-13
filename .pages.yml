@@ -1,0 +1,59 @@
+# Pages CMS — the owner's editor (https://app.pagescms.org)
+# Defines the "Website updates" form. Saving in the editor commits to this repo,
+# and GitHub Pages republishes the site about a minute later.
+
+media:
+  input: assets/uploads
+  output: /assets/uploads
+
+content:
+  - name: updates
+    label: Website updates
+    type: file
+    path: content/updates.json
+    fields:
+      - name: announcement
+        label: Top announcement bar
+        type: object
+        fields:
+          - name: show
+            label: Show the bar
+            type: boolean
+          - name: text
+            label: Announcement text
+            type: string
+
+      - name: updates
+        label: Updates (newest date shows first)
+        type: object
+        list:
+          collapsible:
+            collapsed: true
+            summary: "{title}"
+        fields:
+          - name: title
+            label: Title
+            type: string
+            required: true
+          - name: date
+            label: Date
+            type: date
+            options:
+              format: yyyy-MM-dd
+          - name: tag
+            label: Category
+            type: select
+            options:
+              values: [News, Launch, Store, Offer, Franchise, App, Event]
+          - name: image
+            label: Photo
+            type: image
+            options:
+              extensions: [jpg, jpeg, png, webp]
+              rename: true
+          - name: text
+            label: Short summary (shown on the card)
+            type: text
+          - name: body
+            label: Full article (optional — adds a "Read more" button)
+            type: text

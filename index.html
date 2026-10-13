@@ -28,10 +28,10 @@
   <div class="grain" aria-hidden="true"></div>
 
   <!-- Announcement -->
-  <div class="announce" data-show="announcement.show">
+  <div class="announce" hidden>
     <span class="announce__dot"></span>
-    <span data-c="announcement.text"></span>
-    <a data-href="announcement.link" data-c="announcement.linkLabel"></a>
+    <span class="announce__text"></span>
+    <a href="#updates">See updates</a>
   </div>
 
   <!-- Header -->
@@ -223,6 +223,17 @@
     <p class="footer__values mono"></p>
     <p class="footer__line" data-c="footer.line"></p>
   </footer>
+
+  <!-- Full article view for updates that have a "Full article" -->
+  <dialog class="article" aria-labelledby="article-title">
+    <div class="article__inner">
+      <button class="article__close round" type="button" aria-label="Close article">✕</button>
+      <div class="article__meta mono"></div>
+      <h2 class="article__title" id="article-title"></h2>
+      <img class="article__img" alt="">
+      <div class="article__body"></div>
+    </div>
+  </dialog>
 
   <script src="js/content.js"></script>
   <script src="js/main.js"></script>

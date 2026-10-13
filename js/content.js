@@ -7,19 +7,9 @@
    Rules so nothing breaks:
    - Keep the quotes "..." around text.
    - Keep the comma at the end of each line / block.
-   - To add a new update, copy one { ... } block inside `updates`, paste it
-     at the TOP of the list, and change the text. Newest first.
    ========================================================================== */
 
 window.LOOP_CONTENT = {
-
-  /* Thin strip at the very top of the page. Set show: false to hide it. */
-  announcement: {
-    show: true,
-    text: "Launching soon — Mumbai & Pune first",
-    link: "#updates",
-    linkLabel: "See updates"
-  },
 
   hero: {
     eyebrow: "The Robotic Laundry Revolution",
@@ -93,40 +83,9 @@ window.LOOP_CONTENT = {
     cta: { label: "Apply for a franchise", href: "#contact" }
   },
 
-  /* ----------------------------------------------------------------------
-     UPDATES — the client's news feed. Newest first.
-     image is optional (put the file in /assets and write "assets/name.jpg").
-     ---------------------------------------------------------------------- */
-  updates: [
-    {
-      date: "2026-10-12",
-      tag: "Launch",
-      title: "The Fabric Future is coming",
-      text: "LOOP opens first in Mumbai and Pune. Early-access customers get priority pickups in launch week.",
-      image: "assets/launch-post.jpg"
-    },
-    {
-      date: "2026-10-08",
-      tag: "Franchise",
-      title: "Franchise applications are open",
-      text: "Turnkey stores, premium equipment and full brand support. Talk to us about your city.",
-      image: "assets/brochure.jpg"
-    },
-    {
-      date: "2026-10-02",
-      tag: "Design",
-      title: "First look at the LOOP store",
-      text: "Black glass, warm light, robotic machines on show. This is what laundry looks like now.",
-      image: "assets/storefront.jpg"
-    },
-    {
-      date: "2026-09-25",
-      tag: "App",
-      title: "The LOOP app is in the works",
-      text: "Book, track and pay from your phone. Every load, every step, live.",
-      image: "assets/app-splash.jpg"
-    }
-  ],
+  /* Updates and the top announcement bar are NOT here any more.
+     The owner edits them from his phone at https://app.pagescms.org
+     (they are stored in content/updates.json). */
 
   contact: {
     title: "Start the loop.",
@@ -145,6 +104,6 @@ window.LOOP_CONTENT = {
 
   footer: {
     values: ["Premium", "Robotic", "Global", "National", "International"],
-    line: "© LOOP — All rights reserved. 100 Year Brand Vision."
+    line: "© LOOP — All rights reserved. Unstoppable Legacy Brand Vision."
   }
 };

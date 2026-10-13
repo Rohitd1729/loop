@@ -85,7 +85,6 @@
   $$("[data-c]").forEach((el) => { const v = get(el.dataset.c); if (v != null) el.textContent = v; });
   $$("[data-href]").forEach((el) => { const v = get(el.dataset.href); if (v) el.setAttribute("href", v); });
   $$("[data-src]").forEach((el) => { const v = get(el.dataset.src); if (v) el.src = v; });
-  $$("[data-show]").forEach((el) => { if (!get(el.dataset.show)) el.remove(); });
 
   // Marquee (doubled so the loop is seamless)
   const mq = $(".marquee__track");
@@ -126,19 +125,68 @@
   $(".franchise__list").innerHTML = (C.franchise?.includes || []).map((t, i) =>
     `<li class="reveal" style="--i:${i}"><span>${String(i + 1).padStart(2, "0")}</span>${esc(t)}</li>`).join("");
 
-  // Updates — newest first, "New" badge for the last 14 days
-  const fmt = (d) => new Date(d + "T00:00:00").toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
-  const updates = [...(C.updates || [])].sort((a, b) => (a.date < b.date ? 1 : -1));
-  $(".updates__rail").innerHTML = updates.map((u, i) => {
-    const fresh = (Date.now() - new Date(u.date + "T00:00:00")) / 864e5 <= 14;
-    const tag = u.link ? "a" : "article";
-    return `<${tag} class="update reveal${fresh ? " is-new" : ""}" style="--i:${i}"${u.link ? ` href="${esc(u.link)}"` : ""}>
-      ${u.image ? `<div class="update__media"><img src="${esc(u.image)}" alt="" loading="lazy"></div>` : ""}
-      <div class="update__body">
-        <div class="update__meta mono"><b>${esc(u.tag)}</b><time datetime="${esc(u.date)}">${fmt(u.date)}</time></div>
-        <h3>${esc(u.title)}</h3><p>${esc(u.text)}</p>
-      </div></${tag}>`;
-  }).join("");
+  /* Updates + announcement live in content/updates.json, edited by the owner in Pages CMS.
+     Image paths are saved as "/assets/..."; the leading slash is dropped so they also
+     work while the site sits in a sub-folder (rohitd1729.github.io/loop/). */
+  const asset = (p) => (p ? String(p).replace(/^\/(?!\/)/, "") : "");
+  const fmt = (d) => (d ? new Date(d + "T00:00:00").toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "");
+  let updates = [];
+
+  function renderAnnouncement(a) {
+    const bar = $(".announce");
+    if (!bar) return;
+    if (!a || !a.show || !a.text) { bar.hidden = true; return; }
+    $(".announce__text", bar).textContent = a.text;
+    bar.hidden = false;
+    onScroll();
+  }
+
+  function renderUpdates(list) {
+    updates = [...list].filter((u) => u && u.title).sort((a, b) => (String(a.date) < String(b.date) ? 1 : -1));
+    const rail = $(".updates__rail");
+    if (!updates.length) { rail.innerHTML = `<p class="updates__empty mono">No updates yet.</p>`; return; }
+    rail.innerHTML = updates.map((u, i) => {
+      const fresh = u.date && (Date.now() - new Date(u.date + "T00:00:00")) / 864e5 <= 14;
+      const more = u.body && u.body.trim();
+      return `<article class="update reveal${fresh ? " is-new" : ""}${more ? " has-more" : ""}" style="--i:${i}" data-i="${i}">
+        ${u.image ? `<div class="update__media"><img src="${esc(asset(u.image))}" alt="" loading="lazy"></div>` : ""}
+        <div class="update__body">
+          <div class="update__meta mono"><b>${esc(u.tag)}</b><time datetime="${esc(u.date)}">${fmt(u.date)}</time></div>
+          <h3>${esc(u.title)}</h3><p>${esc(u.text)}</p>
+          ${more ? `<button class="update__more mono" type="button">Read more <span>→</span></button>` : ""}
+        </div></article>`;
+    }).join("");
+    $$(".update", rail).forEach(observeReveal);
+  }
+
+  // Full article view
+  const dialog = $(".article");
+  function openArticle(u) {
+    $(".article__meta", dialog).innerHTML = `<b>${esc(u.tag)}</b><time datetime="${esc(u.date)}">${fmt(u.date)}</time>`;
+    $(".article__title", dialog).textContent = u.title;
+    const img = $(".article__img", dialog);
+    img.hidden = !u.image;
+    if (u.image) img.src = asset(u.image);
+    $(".article__body", dialog).innerHTML = String(u.body).trim().split(/\n\s*\n/)
+      .map((para) => `<p>${esc(para).replace(/\n/g, "<br>")}</p>`).join("");
+    dialog.showModal();
+    dialog.scrollTop = 0;
+  }
+  $(".updates__rail").addEventListener("click", (e) => {
+    const card = e.target.closest(".update.has-more");
+    if (card) openArticle(updates[+card.dataset.i]);
+  });
+  dialog.addEventListener("click", (e) => { if (e.target === dialog || e.target.closest(".article__close")) dialog.close(); });
+
+  fetch("content/updates.json", { cache: "no-store" })
+    .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then((data) => { renderAnnouncement(data.announcement); renderUpdates(data.updates || []); })
+    .catch(() => {
+      // Opened straight from disk (file://) the browser blocks this request; online it works.
+      renderAnnouncement(null);
+      $(".updates__rail").innerHTML = `<p class="updates__empty mono">Updates appear when the site is online.</p>`;
+    });
+
   $$(".updates__nav button").forEach((b) => b.addEventListener("click", () => {
     const rail = $(".updates__rail"), card = $(".update", rail);
     rail.scrollBy({ left: (card ? card.offsetWidth + 24 : 320) * +b.dataset.dir, behavior: "smooth" });
@@ -162,8 +210,10 @@
     el.innerHTML = words.map((w, i) => `<span class="w" aria-hidden="true"><span style="--i:${i}">${esc(w)}</span></span>`).join(" ");
   });
 
+  let io = null;
+  function observeReveal(el) { if (io) io.observe(el); } // before startReveals, the initial sweep picks it up
   function startReveals() {
-    const io = new IntersectionObserver((entries) => entries.forEach((e) => {
+    io = new IntersectionObserver((entries) => entries.forEach((e) => {
       if (!e.isIntersecting) return;
       e.target.classList.add("in");
       if (e.target.matches(".stat")) countUp($("[data-count]", e.target));
