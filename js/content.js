@@ -23,6 +23,21 @@ window.LOOP_CONTENT = {
   /* Scrolling ticker */
   marquee: ["Premium", "Robotic", "Sustainable", "Global", "24/7 Automated", "Low Water", "Low Energy", "AI Powered"],
 
+  /* Cities floating behind the big LOOP logo, drawn as robotic line art.
+     Up to 8. The first 4 also show on phones.
+     monument must be one of: gateway, shaniwarwada, burjkhalifa, marinabay,
+     indiagate, eiffel, bigben, opera */
+  heroCities: [
+    { city: "Mumbai", monument: "gateway", coords: "18.92° N · 72.83° E", tag: "Launch" },
+    { city: "Pune", monument: "shaniwarwada", coords: "18.52° N · 73.86° E", tag: "Launch" },
+    { city: "Dubai", monument: "burjkhalifa", coords: "25.20° N · 55.27° E", tag: "Next" },
+    { city: "Singapore", monument: "marinabay", coords: "1.28° N · 103.86° E", tag: "Next" },
+    { city: "New Delhi", monument: "indiagate", coords: "28.61° N · 77.23° E", tag: "Global" },
+    { city: "Paris", monument: "eiffel", coords: "48.86° N · 2.29° E", tag: "Global" },
+    { city: "London", monument: "bigben", coords: "51.50° N · 0.12° W", tag: "Global" },
+    { city: "Sydney", monument: "opera", coords: "33.86° S · 151.22° E", tag: "Global" }
+  ],
+
   /* "The Loop" — the four-step cycle with the morphing shape */
   cycle: {
     eyebrow: "How it works",

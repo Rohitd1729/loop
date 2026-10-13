@@ -61,6 +61,7 @@
     <!-- HERO -->
     <section class="hero">
       <canvas class="hero__fabric" aria-hidden="true"></canvas>
+      <div class="hero__cities" aria-hidden="true"></div>
       <div class="hero__hud hero__hud--tl mono"><span class="dot"></span> SYS / ONLINE</div>
       <div class="hero__hud hero__hud--tr mono">19.0760° N &nbsp; 72.8777° E</div>
 
@@ -218,10 +219,20 @@
   </main>
 
   <footer class="footer">
-    <div class="footer__logo" data-logo="word"></div>
-    <p class="footer__cities mono"></p>
-    <p class="footer__values mono"></p>
-    <p class="footer__line" data-c="footer.line"></p>
+    <!-- Finale: the same animated logo, fabric and city holograms as the hero -->
+    <section class="finale" aria-label="LOOP — The Fabric Future">
+      <canvas class="hero__fabric" aria-hidden="true"></canvas>
+      <div class="hero__cities" aria-hidden="true"></div>
+      <div class="finale__inner">
+        <div class="finale__logo" data-logo="hero"></div>
+        <p class="hero__tagline" data-c="hero.tagline"></p>
+      </div>
+      <div class="footer__meta">
+        <p class="footer__cities mono"></p>
+        <p class="footer__values mono"></p>
+        <p class="footer__line" data-c="footer.line"></p>
+      </div>
+    </section>
   </footer>
 
   <!-- Full article view for updates that have a "Full article" -->
