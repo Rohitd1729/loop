@@ -17,24 +17,28 @@
       "date": "2026-10-08",
       "tag": "Franchise",
       "image": "/assets/brochure.jpg",
-      "text": "Turnkey stores, premium equipment and full brand support. Talk to us about your city.",
-      "body": ""
+      "text": "Turnkey stores, premium equipment and full brand support. Talk to us about your city."
     },
     {
       "title": "First look at the LOOP store",
       "date": "2026-10-02",
       "tag": "Store",
       "image": "/assets/storefront.jpg",
-      "text": "Black glass, warm light, robotic machines on show. This is what laundry looks like now.",
-      "body": ""
+      "text": "Black glass, warm light, robotic machines on show. This is what laundry looks like now."
     },
     {
       "title": "The LOOP app is in the works",
       "date": "2026-09-25",
       "tag": "App",
       "image": "/assets/app-splash.jpg",
-      "text": "Book, track and pay from your phone. Every load, every step, live.",
-      "body": ""
+      "text": "Book, track and pay from your phone. Every load, every step, live."
+    },
+    {
+      "title": "Launching at Pune",
+      "date": "2026-10-13",
+      "tag": "Launch",
+      "image": "/assets/uploads/1000257419.jpg",
+      "text": "We are launching in Pune\nYou are invited"
     }
   ]
 }
