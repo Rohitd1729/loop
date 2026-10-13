@@ -20,6 +20,7 @@
   const lerp = (a, b, t) => a + (b - a) * t;
   const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a)); return t * t * (3 - 2 * t); };
   const TAU = Math.PI * 2;
+  const easeIO = (x) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
   const IVORY = new T.Color(0xece7df), BRASS = new T.Color(0xb89a63);
 
   /* ---------- renderers, camera, lights ---------- */
@@ -615,14 +616,19 @@
       /* handshake: arms slide in on launch, three firm pumps, then a calm hold while the view orbits */
       const u1 = pinO(o1, 275, 102);
       if (u1) {
-        const tt = reduced ? 1500 : clock % HANDSHAKE_MS;
+        // 0–0.8s hands come together · 0.8–3.2s four firm pumps · 3.2–4.6s hold (glow) · 4.6–5.5s let go
+        const tt = reduced ? 2000 : clock % HANDSHAKE_MS;
+        const gap = reduced ? 0 : 0.2 * (1 - easeIO(clamp(tt / 800))) + 0.2 * easeIO(clamp((tt - 4600) / 900));
         const enter = 1 - Math.pow(1 - k, 3);
-        robotSlide(-1, enter); robotSlide(1, enter);
-        const su = clamp((tt - 500) / 1500), pump = su > 0 && su < 1 ? Math.sin(su * TAU * 1.5) * Math.sin(su * Math.PI) : 0;
-        shake.position.y = pump * 0.075;
-        shake.rotation.z = pump * 0.07;
-        o1Tilt.rotation.set(0.14 + rx * 1.5, -0.12 + 0.2 * Math.sin((clock / 12000) * TAU) + ry * 1.5, 0);
-        gripMat.opacity *= 0.25 + 0.75 * Math.abs(pump);
+        robot.position.x = -((1 - enter) * 1.6 + gap);
+        human.position.x = (1 - enter) * 1.6 + gap;
+        const su = clamp((tt - 800) / 2400), pump = su > 0 && su < 1 ? Math.sin(su * TAU * 4) * Math.sin(su * Math.PI) : 0;
+        shake.position.y = pump * 0.14;
+        shake.rotation.z = pump * 0.12;
+        robot.rotation.z = pump * 0.05; human.rotation.z = -pump * 0.05; // wrists flex with each pump
+        o1Tilt.rotation.set(0.14 + rx * 1.5, -0.12 + 0.22 * Math.sin((clock / 6000) * TAU) + ry * 1.5, 0);
+        const hold = clamp((tt - 3000) / 300) * (1 - clamp((tt - 4400) / 300));
+        gripMat.opacity *= Math.max(Math.abs(pump), hold * (0.75 + 0.25 * Math.sin(clock * 0.012)));
       }
 
       /* washing machine: drum turns, pauses and reverses like a real wash cycle */
@@ -688,9 +694,6 @@
         s.visible = side === 1 ? Math.sin(a) < 0 : Math.sin(a) >= 0;
       }));
     };
-    function robotSlide(side, enter) {
-      (side < 0 ? robot : human).position.x = side * (1 - enter) * 1.6;
-    }
   }
 
   /* ---------- 5. cards tilt toward the pointer ---------- */
