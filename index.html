@@ -135,16 +135,22 @@
       </div>
     </section>
 
-    <!-- STORE -->
-    <section class="store">
+    <!-- STORE: text on one side, a scroll-driven 3D store model on the other (js/world3d.js) -->
+    <section class="store" id="store">
       <div class="store__sticky">
-        <figure class="store__frame">
-          <img class="store__img" data-src="store.image" alt="LOOP store concept: a black storefront with the glowing LOOP logo and robotic washing machines inside">
-        </figure>
         <div class="store__caption">
           <p class="eyebrow" data-c="store.eyebrow"></p>
           <h2 class="h2" data-c="store.title"></h2>
-          <p data-c="store.text"></p>
+          <p class="store__text" data-c="store.text"></p>
+          <ol class="store__steps mono">
+            <li><span>01</span>Walk-in drop-off and doorstep pickup</li>
+            <li><span>02</span>Open-view processing floor</li>
+            <li><span>03</span>Same-day express turnaround</li>
+          </ol>
+        </div>
+        <div class="store__stage">
+          <img class="store__img" data-src="store.image" alt="LOOP store concept: a black storefront with the glowing LOOP logo and robotic washing machines inside">
+          <div class="store__floor" aria-hidden="true"></div>
         </div>
       </div>
     </section>

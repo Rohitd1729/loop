@@ -78,9 +78,9 @@ window.LOOP_CONTENT = {
   ],
 
   store: {
-    eyebrow: "Store concept",
-    title: "Engineered like a lab. Warm like home.",
-    text: "Every LOOP store follows one design system — glass, black and light — so the brand feels the same in Mumbai, Dubai or Singapore.",
+    eyebrow: "The LOOP store",
+    title: "One store format. Every city.",
+    text: "Every LOOP store is built to a single specification: a glass-front retail space, commercial-grade automated machines and a staffed service counter. Customers get the same standard of care in Mumbai, Dubai or Singapore.",
     image: "assets/storefront.jpg"
   },
 

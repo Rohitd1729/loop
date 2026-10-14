@@ -449,7 +449,7 @@
      7. SCROLL — nav, hero parallax, store reveal, drum speed
      ------------------------------------------------------------------------ */
   const nav = $(".nav"), announce = $(".announce"), heroLogo = $(".hero__logo"), heroInner = $(".hero__inner");
-  const store = $(".store"), storeSticky = $(".store__sticky");
+  const store = $(".store"), storeSteps = $$(".store__steps li");
   let lastY = scrollY, velocity = 0;
 
   function onScroll() {
@@ -473,11 +473,8 @@
     if (reduced) drawCycle(0);
 
     const sr = store.getBoundingClientRect();
-    const sp = clamp((vh - sr.top) / (sr.height));
-    const open = smooth(0.2, 0.62, sp);
-    storeSticky.style.setProperty("--p-inv", (1 - open).toFixed(4));
-    storeSticky.style.setProperty("--scrim", smooth(0.45, 0.62, sp).toFixed(3));
-    storeSticky.style.setProperty("--cap", smooth(0.6, 0.78, sp).toFixed(3));
+    const sp = clamp(-sr.top / (sr.height - vh));
+    storeSteps.forEach((li, i) => li.classList.toggle("is-on", sp > [0.05, 0.38, 0.66][i]));
   }
   addEventListener("scroll", onScroll, { passive: true });
   addEventListener("resize", onScroll);

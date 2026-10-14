@@ -807,6 +807,176 @@
     };
   }
 
+  /* ---------- 4c. the LOOP store, as a scroll-driven 3D model ----------
+     Scroll: the store turns from a three-quarter view to face you, the facade and sign
+     light up, the glass doors slide open, the machines inside start spinning, and the
+     camera pushes in. Black, glass and white light only. */
+  function createStore(anchor, section) {
+    const group = new T.Group(), model = new T.Group();
+    group.add(model); fg.add(group);
+    const woodTex = (() => { // walnut: vertical slats with soft grain
+      const c = document.createElement("canvas"); c.width = 512; c.height = 256;
+      const g = c.getContext("2d"); g.fillStyle = "#4a2f1e"; g.fillRect(0, 0, 512, 256);
+      for (let x = 0; x < 512; x += 32) {
+        const gr = g.createLinearGradient(x, 0, x + 32, 0);
+        gr.addColorStop(0, "rgba(0,0,0,.35)"); gr.addColorStop(0.15, "rgba(120,78,46,.35)"); gr.addColorStop(0.85, "rgba(90,58,34,.2)"); gr.addColorStop(1, "rgba(0,0,0,.45)");
+        g.fillStyle = gr; g.fillRect(x, 0, 32, 256);
+        for (let k = 0; k < 6; k++) { g.strokeStyle = `rgba(30,18,10,${0.15 + Math.random() * 0.2})`; g.beginPath(); const xx = x + 4 + Math.random() * 24; g.moveTo(xx, 0); g.bezierCurveTo(xx + 4, 80, xx - 4, 170, xx + 2, 256); g.stroke(); }
+      }
+      return new T.CanvasTexture(c);
+    })();
+    const marbleTex = (() => { // warm cream marble with fine veins
+      const c = document.createElement("canvas"); c.width = 512; c.height = 512;
+      const g = c.getContext("2d"); g.fillStyle = "#e9e2d6"; g.fillRect(0, 0, 512, 512);
+      for (let k = 0; k < 14; k++) {
+        g.strokeStyle = `rgba(150,130,110,${0.12 + Math.random() * 0.2})`; g.lineWidth = 0.6 + Math.random() * 1.6;
+        g.beginPath(); let x = Math.random() * 512, y = 0; g.moveTo(x, y);
+        while (y < 512) { x += (Math.random() - 0.5) * 60; y += 30 + Math.random() * 40; g.lineTo(x, y); }
+        g.stroke();
+      }
+      const t = new T.CanvasTexture(c); t.wrapS = t.wrapT = T.RepeatWrapping; t.repeat.set(2, 1); return t;
+    })();
+    const mat = {
+      black: new T.MeshStandardMaterial({ color: 0x0e0d0c, metalness: 0.5, roughness: 0.3, envMap: studioEnv, envMapIntensity: 0.7 }),
+      frame: new T.MeshStandardMaterial({ color: 0xc9a86a, metalness: 0.95, roughness: 0.22, envMap: studioEnv, envMapIntensity: 1.2 }),
+      floor: new T.MeshStandardMaterial({ map: marbleTex, color: 0xb8b0a4, metalness: 0.05, roughness: 0.18, envMap: studioEnv, envMapIntensity: 0.6 }),
+      wall: new T.MeshStandardMaterial({ map: woodTex, color: 0x9a8a7c, roughness: 0.55, emissive: 0x3a2412, emissiveIntensity: 0 }),
+      side: new T.MeshStandardMaterial({ color: 0x8f8476, roughness: 0.7, emissive: 0xffe2b8, emissiveIntensity: 0 }),
+      steel: new T.MeshStandardMaterial({ color: 0xc9bea9, metalness: 0.55, roughness: 0.3, envMap: studioEnv, envMapIntensity: 0.9 }),
+      dark: new T.MeshStandardMaterial({ color: 0x1a1816, metalness: 0.5, roughness: 0.3, envMap: studioEnv }),
+      gold: new T.MeshStandardMaterial({ color: 0xc9a86a, metalness: 0.95, roughness: 0.2, envMap: studioEnv, envMapIntensity: 1.3, emissive: 0x2a1c08 }),
+      glass: new T.MeshStandardMaterial({ color: 0xfff4e2, metalness: 0.2, roughness: 0.05, envMap: studioEnv, envMapIntensity: 1.4, transparent: true, opacity: 0.12, depthWrite: false }),
+      porthole: new T.MeshStandardMaterial({ color: 0x2b2620, metalness: 0.3, roughness: 0.1, envMap: studioEnv, envMapIntensity: 1.2 }),
+      led: new T.MeshBasicMaterial({ color: 0xf3d9a4 }),
+      leaf: new T.MeshStandardMaterial({ color: 0x3e5a3a, roughness: 0.7, side: T.DoubleSide }),
+      cloth: new T.MeshStandardMaterial({ color: 0xf2ece2, roughness: 0.9, side: T.DoubleSide })
+    };
+    const box = (w, h, d, m, x, y, z) => mesh(new T.BoxGeometry(w, h, d), m, x, y, z);
+    const mesh = (g, m, x = 0, y = 0, z = 0) => { const o = new T.Mesh(g, m); o.position.set(x, y, z); model.add(o); return o; };
+    const W = 2, FY = -0.6, OY = 0.28, TOP = 0.74, ZF = 0.45, ZB = -0.45;
+
+    // shell: fascia, pillars, roof, plinth
+    box(W, TOP - OY, 0.92, mat.black, 0, (TOP + OY) / 2, 0);
+    box(0.12, OY - FY, 0.92, mat.black, -W / 2 + 0.06, (OY + FY) / 2, 0);
+    box(0.12, OY - FY, 0.92, mat.black, W / 2 - 0.06, (OY + FY) / 2, 0);
+    box(W + 0.16, 0.05, 1.05, mat.frame, 0, FY - 0.025, 0.04);
+    // interior: floor, back wall (lights up), ceiling strips, side walls
+    box(W - 0.24, 0.01, 0.9, mat.floor, 0, FY + 0.005, 0);
+    box(W - 0.24, OY - FY, 0.02, mat.wall, 0, (OY + FY) / 2, ZB + 0.01);
+    box(0.02, OY - FY, 0.9, mat.side, -W / 2 + 0.13, (OY + FY) / 2, 0);
+    box(0.02, OY - FY, 0.9, mat.side, W / 2 - 0.13, (OY + FY) / 2, 0);
+    const strips = [-0.25, 0.05, 0.3].map((z) => box(W - 0.4, 0.008, 0.02, mat.led, 0, OY - 0.01, z));
+    // sign: LOOP + tagline on the fascia, drawn to a canvas texture
+    const signCanvas = document.createElement("canvas");
+    signCanvas.width = 1024; signCanvas.height = 240;
+    const signTex = new T.CanvasTexture(signCanvas);
+    const drawSign = () => {
+      const g = signCanvas.getContext("2d");
+      g.fillStyle = "#000"; g.fillRect(0, 0, 1024, 240);
+      g.fillStyle = "#f6f0e6"; g.textAlign = "center"; g.textBaseline = "middle";
+      g.font = '200 150px "Jost", "Futura", sans-serif';
+      if (g.letterSpacing !== undefined) g.letterSpacing = "6px";
+      g.fillText("LOOP", 512, 98);
+      g.fillStyle = "#c9a86a"; g.fillRect(452, 168, 120, 2);
+      g.font = '400 30px "Jost", "Futura", sans-serif';
+      if (g.letterSpacing !== undefined) g.letterSpacing = "8px";
+      g.fillStyle = "#d8b878"; g.fillText("The Fabric Future", 512, 206);
+      signTex.needsUpdate = true;
+    };
+    drawSign();
+    if (document.fonts) document.fonts.load('200 150px "Jost"').then(drawSign).catch(() => {});
+    const signMat = new T.MeshBasicMaterial({ map: signTex, color: 0xffffff });
+    mesh(new T.PlaneGeometry(1.5, 0.35), signMat, 0, (TOP + OY) / 2, ZF + 0.012);
+    // LED outline around the facade
+    const ol = 0.012, oz = ZF + 0.02;
+    [[0, TOP + 0.02, W + 0.04, ol], [0, OY - 0.005, W - 0.24, ol]].forEach(([x, y, w, h]) => box(w, h, 0.01, mat.led, x, y, oz));
+    [-1, 1].forEach((s) => box(ol, TOP - FY + 0.02, 0.01, mat.led, s * (W / 2 + 0.02), (TOP + FY) / 2 + 0.01, oz));
+    // glass front: fixed panes + two sliding doors with black frames and bar handles
+    const pane = (w, x) => {
+      const g = new T.Group();
+      g.add(new T.Mesh(new T.BoxGeometry(w, OY - FY - 0.02, 0.008), mat.glass));
+      [[0, (OY - FY) / 2 - 0.02, w, 0.018], [0, -(OY - FY) / 2 + 0.02, w, 0.03]].forEach(([px, py, pw, ph]) => { const m = new T.Mesh(new T.BoxGeometry(pw, ph, 0.02), mat.frame); m.position.set(px, py, 0); g.add(m); });
+      [-1, 1].forEach((s) => { const m = new T.Mesh(new T.BoxGeometry(0.018, OY - FY - 0.02, 0.02), mat.frame); m.position.set(s * w / 2, 0, 0); g.add(m); });
+      g.position.set(x, (OY + FY) / 2, ZF - 0.04);
+      model.add(g);
+      return g;
+    };
+    pane(0.46, -0.65); pane(0.46, 0.65);
+    const doors = [-1, 1].map((s) => {
+      const d = pane(0.21, s * 0.105);
+      const h = new T.Mesh(new T.BoxGeometry(0.01, 0.34, 0.012), mat.frame);
+      h.position.set(-s * 0.085, 0, 0.02); d.add(h);
+      return d;
+    });
+    // washers along the left wall and the back wall, drums spin when the store comes alive
+    const drums = [];
+    const washer = (x, y, z, ry) => {
+      const g = new T.Group();
+      g.add(new T.Mesh(new T.BoxGeometry(0.2, 0.22, 0.19), mat.steel));
+      const ring = new T.Mesh(new T.TorusGeometry(0.068, 0.012, 12, 40), mat.gold); ring.position.z = 0.1; g.add(ring);
+      const glass = new T.Mesh(new T.CircleGeometry(0.06, 32), mat.porthole); glass.position.z = 0.1; g.add(glass);
+      const drum = new T.Group(); drum.position.z = 0.095;
+      const c = new T.Mesh(new T.PlaneGeometry(0.05, 0.035), mat.cloth); c.position.set(0.02, -0.015, 0.002); drum.add(c);
+      const c2 = new T.Mesh(new T.PlaneGeometry(0.04, 0.03), mat.cloth); c2.position.set(-0.022, 0.012, 0.003); c2.rotation.z = 0.7; drum.add(c2);
+      g.add(drum); drums.push(drum);
+      g.position.set(x, y, z); g.rotation.y = ry;
+      model.add(g);
+    };
+    [[-0.32, 0], [-0.08, 0], [0.16, 0]].forEach(([z]) => { washer(-0.76, FY + 0.11, z, Math.PI / 2); washer(-0.76, FY + 0.335, z, Math.PI / 2); });
+    [-0.3, -0.06].forEach((x) => washer(x, FY + 0.11, ZB + 0.12, 0));
+    // counter island + shelves on the right
+    box(0.42, 0.19, 0.2, mat.dark, 0.36, FY + 0.095, 0.02);
+    box(0.44, 0.012, 0.22, mat.floor, 0.36, FY + 0.196, 0.02);
+    box(0.42, 0.006, 0.006, mat.gold, 0.36, FY + 0.19, 0.122);
+    // pendant lights over the counter
+    [0.24, 0.48].forEach((x) => {
+      box(0.003, 0.2, 0.003, mat.gold, x, OY - 0.11, 0.02);
+      const shade = mesh(new T.ConeGeometry(0.035, 0.04, 24, 1, true), mat.gold, x, OY - 0.22, 0.02); shade.material.side = T.DoubleSide;
+      mesh(new T.SphereGeometry(0.012, 12, 10), mat.led, x, OY - 0.235, 0.02);
+    });
+    // plant in a black pot at the front right
+    mesh(new T.CylinderGeometry(0.045, 0.035, 0.09, 24), mat.dark, 0.72, FY + 0.045, 0.3);
+    for (let i = 0; i < 9; i++) {
+      const lf = mesh(new T.PlaneGeometry(0.035, 0.16), mat.leaf, 0.72, FY + 0.16, 0.3);
+      lf.rotation.set(0.35 * Math.cos(i * 2.4), i * 0.7, 0.45 * Math.sin(i * 1.7));
+    }
+    [0.0, 0.16].forEach((dy) => {
+      box(0.02, 0.012, 0.5, mat.dark, W / 2 - 0.16, FY + 0.42 + dy, -0.12);
+      [-0.3, -0.18, -0.06, 0.06].forEach((z, i) => box(0.06, 0.06 + (i % 2) * 0.03, 0.07, i % 3 ? mat.floor : mat.steel, W / 2 - 0.19, FY + 0.46 + dy + (i % 2) * 0.015, z));
+    });
+    // interior light (moves with the model)
+    const inside = new T.PointLight(0xffd9a6, 0, 3.2, 2);
+    // warm light spilling out onto the pavement
+    const spill = new T.Mesh(new T.PlaneGeometry(1.9, 0.7), new T.MeshBasicMaterial({ map: dotTex, color: 0xf3c98a, transparent: true, opacity: 0, depthWrite: false, blending: T.AdditiveBlending }));
+    spill.rotation.x = -Math.PI / 2; spill.position.set(0, FY + 0.003, ZF + 0.3); model.add(spill);
+    inside.position.set(0, OY - 0.12, 0.05); model.add(inside);
+
+    const sub = (x, a, b) => clamp((x - a) / (b - a));
+    let tilt = 0, spin = 0;
+    return function update(t, dt) {
+      const r = pin(group, anchor);
+      if (!r) return;
+      const cr = section.getBoundingClientRect();
+      const p = reduced ? 0.7 : clamp(-cr.top / (cr.height - innerHeight));
+      const turn = easeIO(sub(p, 0, 0.5)), lit = smooth(0.04, 0.22, p), open = easeIO(sub(p, 0.36, 0.58)), alive = smooth(0.6, 0.78, p), push = easeIO(sub(p, 0.66, 1));
+      // flicker while the sign switches on, then steady
+      const flick = p > 0.04 && p < 0.2 ? (Math.sin(t * 0.05) > 0.2 ? 1 : 0.35) : 1;
+      const on = (0.12 + 0.88 * lit) * flick;
+      signMat.color.setScalar(on); mat.led.color.setScalar(on);
+      mat.wall.emissiveIntensity = 0.1 + 0.35 * lit + 0.15 * alive; mat.side.emissiveIntensity = 0.01 + 0.04 * lit;
+      spill.material.opacity = 0.5 * lit * flick;
+      inside.intensity = (0.15 + 0.7 * lit) * flick;
+      strips.forEach((s) => (s.visible = lit > 0.3));
+      doors.forEach((d, i) => (d.position.x = (i ? 1 : -1) * (0.105 + open * 0.22)));
+      spin += dt * (1 + alive * 9);
+      drums.forEach((d, i) => (d.rotation.z = spin * (i % 2 ? 1 : -1.1)));
+      tilt = lerp(tilt, fine ? mouse.nx * 0.1 : 0, 0.05);
+      model.rotation.set(0.12 + push * 0.04, lerp(-0.72, 0, turn) + tilt + Math.sin(t * 0.0005) * 0.03 * (1 - push), 0);
+      model.position.set(0, -0.05 - push * 0.04, 0);
+      group.scale.setScalar((Math.min(r.width / 2, r.height / 1.45)) * wpp * 0.88 * (1 + push * 0.1));
+    };
+  }
+
   /* ---------- 5. cards tilt toward the pointer ---------- */
   if (fine && !reduced) {
     let cur = null;
@@ -828,7 +998,8 @@
     ...$$(".hero, .finale").map(createLogo3D),
     createDust(),
     ...($(".cycle__stage") ? [createDrum($(".cycle__stage"), $(".cycle"))] : []),
-    createPillarIcons()
+    createPillarIcons(),
+    ...($(".store__stage") ? [createStore($(".store__stage"), $(".store"))] : [])
   ];
   let prev = performance.now();
   function frame(now) {
