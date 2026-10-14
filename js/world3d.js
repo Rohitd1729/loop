@@ -361,12 +361,12 @@
   }
 
   /* ---------- 4b. the LOOP wordmark in 3D ----------
-     First O: a robot hand and a business hand shaking (3D, clipped to the O by a stencil).
+     First O: "precision fold": a business hand hands over a garment, the robot folds, scans and takes it in.
      Second O: a front-load washing machine door: chrome ring, rubber gasket, domed glass,
      a reversing drum with baffles, tumbling clothes and sloshing water.
      Plus an orbit ring around the word and a pointer-driven depth tilt.
      The flat SVG letters stay the source of truth; 3D is pinned to their geometry. */
-  const HANDSHAKE_MS = 6000;
+  
 
   // a soft studio environment so steel and chrome have something to reflect
   const studioEnv = (() => {
@@ -390,6 +390,10 @@
     pm.dispose();
     return env;
   })();
+
+  // Code-built scenes inside the Os are off: the first O plays artwork video (hero.o1Video),
+  // the second O is the original arc reactor. O1_SCENE / O2_SCENE bring back the 3D scenes.
+  const O1_SCENE = false, O2_SCENE = false;
 
   function createLogo3D(root) {
     const logoEl = $('[data-logo="hero"]', root), svg = logoEl && $("svg", logoEl);
@@ -429,85 +433,163 @@
       return u;
     }
 
-    /* ===== first O: the handshake ===== */
-    const o1 = new T.Group(), o1Tilt = new T.Group(), model = new T.Group(), shake = new T.Group();
-    o1.add(mask(1), o1Tilt); o1Tilt.add(model); model.add(shake); fg.add(o1);
-    model.scale.setScalar(1.6); model.position.set(0.06, -0.02, 0);
-    const skin = M(std(0xd8bf9f, 0, 0.78, { envMapIntensity: 0.25 }), 1, 1);
-    const suit = M(std(0x2b2b30, 0.1, 0.5, { envMapIntensity: 0.6 }), 1, 1);
-    const shirt = M(std(0xf6f2ea, 0, 0.5, { envMapIntensity: 0.5 }), 1, 1);
-    const steel = M(std(0xd9d3c9, 0.75, 0.24), 1, 1);
-    const dark = M(std(0x45423e, 0.7, 0.35), 1, 1);
-    const brass = M(std(BRASS, 0.85, 0.25, { emissive: 0x24190a }), 1, 1);
-    const led = M(new T.MeshBasicMaterial({ color: 0xf0dcae }), 1, 1);
-    const btn = M(std(0x8f8a82, 0.3, 0.4), 1, 1);
-    const chain = (pts, r, mat, joint) => {
-      const g = new T.Group();
-      for (let i = 0; i < pts.length - 1; i++) {
-        const a = pts[i], b = pts[i + 1], c = new T.Mesh(new T.CylinderGeometry(r, r, a.distanceTo(b), 18), mat);
-        c.position.copy(a).add(b).multiplyScalar(0.5);
-        c.quaternion.setFromUnitVectors(V(0, 1, 0), b.clone().sub(a).normalize());
-        g.add(c);
-      }
-      pts.forEach((p, i) => {
-        const mid = i > 0 && i < pts.length - 1;
-        g.add(mesh(new T.SphereGeometry(r * (mid ? 1.15 : 1), 18, 14), mid ? joint : mat, p.x, p.y, p.z));
+    /* ===== first O: precision fold (client storyboard) =====
+       0–0.8s approach · 0.8–1.5s handover · 1.5–2.5s precision fold · 2.5–3.5s smart scan
+       3.5–4.2s system intake · 4.2–5s reset. Frame 5000 equals frame 0, so the loop is seamless. */
+    const o1 = new T.Group(), o1Tilt = new T.Group(), scene1 = new T.Group();
+    o1.add(mask(1), o1Tilt); o1Tilt.add(scene1); if (O1_SCENE) fg.add(o1);
+    scene1.scale.setScalar(1.85); scene1.position.y = 0.04;
+    const ivoryR = M(std(0xbdb8b0, 0.1, 0.3, { envMapIntensity: 0.7 }), 1, 1);
+    const jointD = M(std(0x3a3835, 0.6, 0.4), 1, 1);
+    const brassF = M(std(BRASS, 0.85, 0.25, { emissive: 0x24190a }), 1, 1);
+    const skinF = M(std(0xb08866, 0, 0.6, { envMapIntensity: 0.3 }), 1, 1);
+    const suitF = M(std(0x1c1c20, 0.1, 0.5, { envMapIntensity: 0.5 }), 1, 1);
+    const cuffF = M(std(0xd0cbc3, 0, 0.5, { envMapIntensity: 0.4 }), 1, 1);
+    const clothF = M(std(0xcfc8bb, 0, 0.88, { side: T.DoubleSide, envMapIntensity: 0.3 }), 1, 1);
+    const stackF = M(std(0xcfc8bb, 0, 0.88, { envMapIntensity: 0.3 }), 1, 1);
+    const stackSeam = M(new T.LineBasicMaterial({ color: 0x8f877a }), 0.9, 1);
+    const glowMat = (c, base) => M(new T.MeshBasicMaterial({ color: c, depthWrite: false, blending: T.AdditiveBlending, side: T.DoubleSide }), base, 1);
+    const slab = (w, d, h, rad, mat) => { // rounded rectangle in x–z, thickness h along y, centred on the origin
+      const sh = new T.Shape(), x0 = -w / 2, y0 = -d / 2, bev = h * 0.35;
+      sh.moveTo(x0 + rad, y0); sh.lineTo(x0 + w - rad, y0); sh.quadraticCurveTo(x0 + w, y0, x0 + w, y0 + rad);
+      sh.lineTo(x0 + w, y0 + d - rad); sh.quadraticCurveTo(x0 + w, y0 + d, x0 + w - rad, y0 + d); sh.lineTo(x0 + rad, y0 + d);
+      sh.quadraticCurveTo(x0, y0 + d, x0, y0 + d - rad); sh.lineTo(x0, y0 + rad); sh.quadraticCurveTo(x0, y0, x0 + rad, y0);
+      const g = new T.ExtrudeGeometry(sh, { depth: h - 2 * bev, bevelEnabled: true, bevelThickness: bev, bevelSize: bev * 0.8, bevelSegments: 5, curveSegments: 10 });
+      g.translate(0, 0, -(h - 2 * bev) / 2); g.rotateX(-Math.PI / 2);
+      return new T.Mesh(g, mat);
+    };
+    const UP = V(0, 1, 0), segGeo = new T.CylinderGeometry(1, 1, 1, 16), sphGeo = new T.SphereGeometry(1, 18, 14);
+    // a jointed chain (finger): segments + joint spheres, re-posed every frame from a list of points
+    function makeChain(n, r, segMat, jointMat, parent) {
+      const segs = [], joints = [], d = V(0, 0, 0);
+      for (let i = 0; i < n; i++) { const c = new T.Mesh(segGeo, segMat); parent.add(c); segs.push(c); }
+      for (let i = 0; i <= n; i++) { const j = new T.Mesh(sphGeo, i === n ? segMat : jointMat); j.scale.setScalar(r * (i === n ? 1 : 1.12)); parent.add(j); joints.push(j); }
+      return (pts) => {
+        for (let i = 0; i < n; i++) {
+          const a = pts[i], b = pts[i + 1], c = segs[i];
+          c.position.copy(a).add(b).multiplyScalar(0.5);
+          d.copy(b).sub(a); const len = d.length();
+          c.quaternion.setFromUnitVectors(UP, d.normalize());
+          c.scale.set(r, len, r);
+        }
+        pts.forEach((q, i) => joints[i].position.copy(q));
+      };
+    }
+    const along = (geo, dir, mat, dist) => { const m = new T.Mesh(geo, mat); m.quaternion.setFromUnitVectors(UP, dir); m.position.copy(dir).multiplyScalar(dist); return m; };
+
+    // robot hand, palm up, fingers pointing left (origin = palm centre)
+    const robotH = new T.Group(); scene1.add(robotH);
+    robotH.add(slab(0.24, 0.2, 0.05, 0.05, ivoryR));
+    robotH.add(mesh(new T.CylinderGeometry(0.03, 0.03, 0.006, 28), brassF, 0.02, 0.026, 0));
+    robotH.add(mesh(new T.CylinderGeometry(0.018, 0.018, 0.008, 24), jointD, 0.02, 0.028, 0));
+    robotH.add(mesh(new T.SphereGeometry(0.058, 24, 18), jointD, 0.14, 0, 0));
+    const wristRing = mesh(new T.TorusGeometry(0.064, 0.009, 10, 40), brassF, 0.175, 0, 0); wristRing.rotation.y = Math.PI / 2;
+    const band = mesh(new T.TorusGeometry(0.08, 0.006, 8, 40), jointD, 0.5, 0, 0); band.rotation.y = Math.PI / 2;
+    robotH.add(wristRing, band, mesh(new T.CylinderGeometry(0.07, 0.086, 1.2, 36).rotateZ(Math.PI / 2), ivoryR, 0.78, 0, 0));
+    const RF = [[-0.07, 0.85], [-0.023, 1], [0.023, 0.97], [0.07, 0.88]];
+    const fingerSet = RF.map(() => makeChain(3, 0.019, ivoryR, brassF, robotH));
+    const thumbSet = makeChain(2, 0.021, ivoryR, brassF, robotH);
+    function setRobotFingers(g) {
+      RF.forEach(([z, l], i) => {
+        let A = 0, q = V(-0.12, 0.004, z);
+        const pts = [q];
+        [0.072, 0.056, 0.046].forEach((len, j) => {
+          A += lerp([0.08, 0.14, 0.1][j], [0.55, 0.85, 0.7][j], g);
+          q = q.clone().add(V(-Math.cos(A) * len * l, Math.sin(A) * len * l, 0)); pts.push(q);
+        });
+        fingerSet[i](pts);
       });
+      const t0 = V(-0.07, 0, 0.105), t1 = t0.clone().add(V(-0.042, 0.012 + 0.03 * g, 0.05)), t2 = t1.clone().add(V(-0.046, 0.01 + 0.035 * g, 0.012 - 0.03 * g));
+      thumbSet([t0, t1, t2]);
+    }
+
+    // business hand pinching the garment from above (origin = pinch point)
+    const humanH = new T.Group(); scene1.add(humanH);
+    const AD = V(-1, 0.42, 0).normalize();
+    humanH.add(
+      along(new T.CylinderGeometry(0.078, 0.082, 1.2, 36), AD, suitF, 1.02),
+      along(new T.CylinderGeometry(0.063, 0.063, 0.075, 32), AD, cuffF, 0.375),
+      along(new T.CylinderGeometry(0.045, 0.05, 0.12, 24), AD, skinF, 0.29)
+    );
+    const link = mesh(new T.SphereGeometry(0.012, 12, 10), brassF); link.position.copy(AD).multiplyScalar(0.375).add(V(0, 0, 0.063)); humanH.add(link);
+    [[0.42, 0.012], [0.46, 0.012], [0.5, 0.012]].forEach(([d]) => { const b = mesh(new T.SphereGeometry(0.01, 10, 8), cuffF); b.position.copy(AD).multiplyScalar(d).add(V(0, -0.05, 0.06)); humanH.add(b); });
+    const backHand = mesh(sphGeo, skinF, -0.13, 0.078, 0); backHand.scale.set(0.11, 0.042, 0.085); backHand.rotation.z = -0.42; humanH.add(backHand);
+    const tube = (pts, r) => {
+      const g = new T.Group(), a = pts[0], b = pts[pts.length - 1];
+      g.add(new T.Mesh(new T.TubeGeometry(new T.CatmullRomCurve3(pts), 20, r, 12, false), skinF));
+      g.add(mesh(new T.SphereGeometry(r, 14, 10), skinF, a.x, a.y, a.z), mesh(new T.SphereGeometry(r, 14, 10), skinF, b.x, b.y, b.z));
       return g;
     };
-    const finger = (pts, r) => {
-      const g = new T.Group(), end = pts[pts.length - 1];
-      g.add(new T.Mesh(new T.TubeGeometry(new T.CatmullRomCurve3(pts), 28, r, 14, false), skin));
-      g.add(mesh(new T.SphereGeometry(r, 16, 12), skin, end.x, end.y, end.z), mesh(new T.SphereGeometry(r, 16, 12), skin, pts[0].x, pts[0].y, pts[0].z));
-      return g;
-    };
-    const ringAt = (x, r, tube, mat, z = 0) => { const m = mesh(new T.TorusGeometry(r, tube, 12, 56), mat, x, 0, z); m.rotation.y = Math.PI / 2; return m; };
+    [-0.055, -0.018, 0.02, 0.055].forEach((z, i) =>
+      humanH.add(tube([V(-0.06, 0.078, z), V(-0.012, 0.062, z * 0.85), V(0.008, 0.026, z * 0.55), V(0.002, 0.004, z * 0.35)], i === 3 ? 0.016 : 0.019)));
+    humanH.add(tube([V(-0.14, 0.03, 0.066), V(-0.07, 0.0, 0.06), V(-0.014, -0.012, 0.03)], 0.022));
 
-    // robot (from the left): segmented steel forearm, piston, LED strip, wrist, palm behind, thumb on top
-    const robot = new T.Group();
-    robot.add(
-      mesh(alongX(new T.CylinderGeometry(0.14, 0.15, 0.72, 48)), steel, -1.15, 0, -0.08),
-      mesh(alongX(new T.CylinderGeometry(0.122, 0.134, 0.46, 48)), steel, -0.56, 0, -0.08),
-      ringAt(-0.785, 0.146, 0.018, dark, -0.08), ringAt(-1.25, 0.152, 0.006, dark, -0.08),
-      ringAt(-0.33, 0.124, 0.013, brass, -0.08),
-      mesh(alongX(new T.CylinderGeometry(0.022, 0.022, 0.72, 14)), dark, -0.8, -0.168, 0.0),
-      mesh(new T.SphereGeometry(0.03, 14, 10), brass, -1.16, -0.168, 0.0), mesh(new T.SphereGeometry(0.03, 14, 10), brass, -0.44, -0.168, 0.0),
-      mesh(new T.SphereGeometry(0.098, 28, 20), dark, -0.27, 0, -0.08),
-      mesh(new T.BoxGeometry(0.3, 0.19, 0.12), steel, -0.06, -0.01, -0.17)
-    );
-    const strip = mesh(new T.BoxGeometry(0.32, 0.012, 0.024), led, -0.58, 0.088, 0.01);
-    strip.rotation.x = -0.78;
-    robot.add(strip);
-    robot.add(chain([V(-0.2, 0.06, -0.06), V(-0.06, 0.125, 0.02), V(0.08, 0.13, 0.07)], 0.032, steel, brass));
-    [-0.2, -0.14, -0.08].forEach((z) => robot.add(chain([V(0.05, -0.08, z), V(0.16, -0.13, z + 0.03), V(0.23, -0.06, z + 0.05)], 0.027, steel, brass)));
+    // the garment: a cloth sheet whose vertices are posed every frame (hang → lie → fold, fold)
+    const CN = 20, CW = 0.36, CD = 0.32;
+    const clothGeo = new T.PlaneGeometry(1, 1, CN, CN), cpos = clothGeo.attributes.position.array;
+    const cloth = new T.Mesh(clothGeo, clothF); cloth.frustumCulled = false; scene1.add(cloth);
+    function clothFrame(tt, P, Q) {
+      const give = easeIO(clamp((tt - 1000) / 600));
+      const f1 = easeIO(clamp((tt - 1650) / 380)), f2 = easeIO(clamp((tt - 2070) / 380));
+      const th1 = Math.PI * f1 * 0.985, th2 = Math.PI * f2 * 0.985;
+      for (let iy = 0; iy <= CN; iy++) for (let ix = 0; ix <= CN; ix++) {
+        const u = ix / CN, s2 = iy / CN, o = (iy * (CN + 1) + ix) * 3;
+        // hanging from the pinch: narrow at the fingers, flared and rippling below
+        const hx = P.x + (u - 0.5) * CW * lerp(0.2, 1, Math.pow(s2, 0.75)) + Math.sin(clock * 0.003) * 0.015 * s2;
+        const hy = P.y - s2 * CD * 0.95;
+        const hz = P.z + Math.sin(u * TAU * 1.5 + clock * 0.004) * 0.025 * s2 + (u - 0.5) * 0.04 * s2;
+        // lying on the palm (held edge at the back), then folded twice
+        let xr = (u - 0.5) * CW, zr = (s2 - 0.5) * CD;
+        const droop = (1 - f1) * (Math.pow(Math.max(0, Math.abs(xr) - 0.13), 2) + Math.pow(Math.max(0, Math.abs(zr) - 0.11), 2)) * 4;
+        let y = 0.03 - droop + Math.sin(xr * 20 + zr * 14) * 0.004 * (1 - f1);
+        if (xr > 0) { const x0 = xr; xr = x0 * Math.cos(th1); y += x0 * Math.sin(th1) + 0.008 * f1; }
+        if (zr > 0) { const z0 = zr; zr = z0 * Math.cos(th2); y += z0 * Math.sin(th2) + 0.008 * f2; }
+        xr += (CW / 4) * f1; zr += (CD / 4) * f2;
+        cpos[o] = lerp(hx, Q.x + xr, give);
+        cpos[o + 1] = lerp(hy, Q.y + y, give) + Math.sin(Math.PI * give) * 0.06 * (0.5 + s2);
+        cpos[o + 2] = lerp(hz, Q.z + zr, give);
+      }
+      clothGeo.attributes.position.needsUpdate = true;
+      clothGeo.computeVertexNormals();
+    }
+    // the folded garment (swapped in once the sheet is folded)
+    const stackG = new T.Group(); scene1.add(stackG);
+    stackG.add(slab(CW / 2, CD / 2, 0.034, 0.018, stackF));
+    [-0.006, 0.006].forEach((y) => stackG.add(new T.Line(new T.BufferGeometry().setFromPoints([V(-CW / 4 + 0.012, y, CD / 4 + 0.001), V(CW / 4 - 0.012, y, CD / 4 + 0.001)]), stackSeam)));
 
-    // business person (from the right): suit sleeve, buttons, shirt cuff + cufflink, hand wrapping the robot palm
-    const human = new T.Group();
-    human.add(
-      mesh(alongX(new T.CylinderGeometry(0.165, 0.172, 1.1, 48)), suit, 0.98, 0, 0),
-      ringAt(0.43, 0.165, 0.012, suit),
-      mesh(alongX(new T.CylinderGeometry(0.128, 0.128, 0.13, 40)), shirt, 0.375, 0, 0),
-      mesh(new T.SphereGeometry(0.022, 14, 10), brass, 0.375, 0.0, 0.128),
-      mesh(alongX(new T.CylinderGeometry(0.074, 0.086, 0.14, 28)), skin, 0.27, 0.0, 0)
-    );
-    [0.52, 0.58, 0.64].forEach((x) => human.add(mesh(new T.SphereGeometry(0.016, 12, 10), btn, x, -0.085, 0.142)));
-    const back = mesh(new T.SphereGeometry(1, 40, 24), skin, 0.08, 0.02, 0);
-    back.scale.set(0.2, 0.08, 0.13); back.rotation.z = -0.08;
-    const knuckles = mesh(new T.SphereGeometry(1, 32, 20), skin, -0.06, 0.03, 0);
-    knuckles.scale.set(0.06, 0.07, 0.125);
-    human.add(back, knuckles);
-    [[0.085, 0.029, 0.88], [0.03, 0.033, 1], [-0.025, 0.033, 0.97], [-0.075, 0.03, 0.86]].forEach(([z, r, l]) =>
-      human.add(finger([V(-0.06, 0.035, z), V(-0.15, 0.03, z), V(-0.205, -0.03, z * 0.8), V(-0.205, -0.03 - 0.06 * l, z * 0.4 - 0.07), V(-0.18, -0.05 - 0.07 * l, -0.16)], r)));
-    human.add(finger([V(0.12, 0.04, -0.1), V(0.02, 0.1, -0.15), V(-0.08, 0.11, -0.18)], 0.034));
-    shake.add(robot, human);
-    // brass glow at the grip, pulses with each pump
-    const gripGlow = new T.Sprite(M(new T.SpriteMaterial({ map: dotTex, color: BRASS, blending: T.AdditiveBlending, depthWrite: false, depthTest: false }), 0.75, 1));
-    gripGlow.scale.setScalar(0.55); gripGlow.position.set(0, 0.02, 0.2);
-    shake.add(gripGlow);
+    // effects: handover glow, fold arrows, scan ring, HUD brackets, light traces
+    const touchGlow = new T.Sprite(M(new T.SpriteMaterial({ map: dotTex, color: 0xf0dcae, blending: T.AdditiveBlending, depthWrite: false }), 0.85, 1));
+    scene1.add(touchGlow);
+    const arrowMat = glowMat(0xd9bd85, 0.9), arrows = new T.Group();
+    [0.35, 0.35 + Math.PI].forEach((a0) => {
+      const arc = new T.Mesh(new T.TorusGeometry(0.2, 0.004, 6, 48, 1.6), arrowMat); arc.rotation.z = a0;
+      const head = new T.Mesh(new T.ConeGeometry(0.014, 0.034, 12), arrowMat);
+      head.position.set(Math.cos(a0) * 0.2, Math.sin(a0) * 0.2, 0); head.rotation.z = a0 + Math.PI; // points clockwise
+      arrows.add(arc, head);
+    });
+    scene1.add(arrows);
+    const scanMat = glowMat(0xf0dcae, 1), scanRing = new T.Mesh(new T.TorusGeometry(0.16, 0.0035, 6, 72), scanMat);
+    scanRing.rotation.x = Math.PI / 2; scene1.add(scanRing);
+    const hudMat = M(new T.LineBasicMaterial({ color: BRASS }), 0.9, 1), hp = [], bw = 0.15, bh = 0.08, bl = 0.035;
+    [[-1, -1], [1, -1], [1, 1], [-1, 1]].forEach(([sx, sy]) => hp.push(V(sx * bw, sy * bh, 0), V(sx * (bw - bl), sy * bh, 0), V(sx * bw, sy * bh, 0), V(sx * bw, sy * (bh - bl), 0)));
+    const hud = new T.LineSegments(new T.BufferGeometry().setFromPoints(hp), hudMat); scene1.add(hud);
+    const beamTex = (() => {
+      const c = document.createElement("canvas"); c.width = 4; c.height = 128;
+      const g = c.getContext("2d"), gr = g.createLinearGradient(0, 128, 0, 0);
+      gr.addColorStop(0, "rgba(255,255,255,0)"); gr.addColorStop(0.15, "rgba(255,255,255,1)"); gr.addColorStop(1, "rgba(255,255,255,0)");
+      g.fillStyle = gr; g.fillRect(0, 0, 4, 128);
+      return new T.CanvasTexture(c);
+    })();
+    const beamMat = M(new T.MeshBasicMaterial({ map: beamTex, color: 0xd9bd85, depthWrite: false, blending: T.AdditiveBlending, side: T.DoubleSide }), 1, 1);
+    const beams = new T.Group();
+    [[-0.12, 0.02, 0.006], [-0.07, -0.04, 0.01], [-0.025, 0.05, 0.004], [0.02, -0.02, 0.012], [0.065, 0.04, 0.006], [0.11, -0.03, 0.009], [0.0, 0.0, 0.016]].forEach(([x, z, w]) => {
+      const b = new T.Mesh(new T.PlaneGeometry(w, 0.9), beamMat); b.position.set(x, 0.45, z); beams.add(b);
+    });
+    scene1.add(beams);
 
     /* ===== second O: front-load machine door ===== */
     const o2 = new T.Group(), o2Tilt = new T.Group(), drum = new T.Group(), spin = new T.Group();
-    o2.add(mask(2), o2Tilt); fg.add(o2);
+    o2.add(mask(2), o2Tilt); if (O2_SCENE) fg.add(o2);
     const chrome = M(std(0xeee9e0, 0.9, 0.16), 1, 2);
     const rubber = M(std(0x2f2d2b, 0.05, 0.85, { envMapIntensity: 0.3 }), 1, 2);
     const drumSteel = M(std(0xb4aea5, 0.85, 0.32, { side: T.DoubleSide }), 1, 2);
@@ -597,7 +679,7 @@
 
     const tilt = { x: 0, y: 0 };
     let launchAt = -1, drumAngle = 0, clock = 0;
-    const gripMat = gripGlow.material, statusMat = status.material;
+    const statusMat = status.material;
     return function update(t, dt) {
       const live = root.classList.contains("is-live");
       if (live && launchAt < 0) launchAt = performance.now();
@@ -613,26 +695,55 @@
       const rx = (tilt.x * Math.PI) / 180, ry = (tilt.y * Math.PI) / 180;
       clock += dt * 1000;
 
-      /* handshake: arms slide in on launch, three firm pumps, then a calm hold while the view orbits */
-      const u1 = pinO(o1, 275, 102);
+      const u1 = O1_SCENE ? pinO(o1, 275, 102) : 0;
       if (u1) {
-        // 0–0.8s hands come together · 0.8–3.2s four firm pumps · 3.2–4.6s hold (glow) · 4.6–5.5s let go
-        const tt = reduced ? 2000 : clock % HANDSHAKE_MS;
-        const gap = reduced ? 0 : 0.2 * (1 - easeIO(clamp(tt / 800))) + 0.2 * easeIO(clamp((tt - 4600) / 900));
+        const tt = reduced ? 2950 : clock % 5000, sub = (a0, b0) => clamp((tt - a0) / (b0 - a0));
         const enter = 1 - Math.pow(1 - k, 3);
-        robot.position.x = -((1 - enter) * 1.6 + gap);
-        human.position.x = (1 - enter) * 1.6 + gap;
-        const su = clamp((tt - 800) / 2400), pump = su > 0 && su < 1 ? Math.sin(su * TAU * 4) * Math.sin(su * Math.PI) : 0;
-        shake.position.y = pump * 0.14;
-        shake.rotation.z = pump * 0.12;
-        robot.rotation.z = pump * 0.05; human.rotation.z = -pump * 0.05; // wrists flex with each pump
-        o1Tilt.rotation.set(0.14 + rx * 1.5, -0.12 + 0.22 * Math.sin((clock / 6000) * TAU) + ry * 1.5, 0);
-        const hold = clamp((tt - 3000) / 300) * (1 - clamp((tt - 4400) / 300));
-        gripMat.opacity *= Math.max(Math.abs(pump), hold * (0.75 + 0.25 * Math.sin(clock * 0.012)));
+        o1Tilt.rotation.set(0.36 + rx * 1.5, -0.12 + Math.sin((clock / 10000) * TAU) * 0.1 + ry * 1.5, 0);
+        // business hand: approach, small reach, then withdraw off-stage once it has let go
+        const hx = lerp(-1.25, -0.1, 1 - Math.pow(1 - sub(0, 800), 3)) + 0.06 * easeIO(sub(800, 1150)) - 1.25 * easeIO(sub(1500, 2400));
+        humanH.position.set(hx, 0.3 - 0.04 * easeIO(sub(800, 1150)), 0.02);
+        // robot: idle sway, brings the garment to the centre for the scan, returns for the reset
+        const bring = easeIO(sub(2400, 2800)) * (1 - easeIO(sub(4200, 4900)));
+        const bob = Math.sin((tt / 5000) * TAU) * 0.008;
+        robotH.position.set(lerp(0.2, 0.04, bring) + (1 - enter) * 1.3, -0.22 + 0.04 * bring + bob, 0);
+        // fingers: open → receive → small precise fold movements → present → open
+        const recv = easeIO(sub(1250, 1600)), work = sub(1600, 2500), present = easeIO(sub(2500, 2800)), relax = easeIO(sub(4200, 4800));
+        setRobotFingers(recv * (1 - present) * (0.42 + (work > 0 && work < 1 ? 0.22 * Math.sin(work * TAU * 2) : 0)) + 0.12 * present * (1 - relax));
+        const P = humanH.position, Q = robotH.position;
+        const folded = tt >= 2480;
+        cloth.visible = !folded;
+        if (!folded) clothFrame(tt, P, Q);
+        // folded garment: lifts for the scan, then rises into the light and dissolves
+        const ie = Math.pow(sub(3500, 4200), 2);
+        stackG.visible = folded && tt < 4200;
+        stackG.position.set(Q.x, Q.y + 0.047 + easeIO(sub(2480, 2800)) * 0.09 + 0.6 * ie, Q.z);
+        stackG.scale.setScalar(Math.max(0.001, 1 - 0.55 * ie));
+        stackF.opacity *= 1 - ie; stackSeam.opacity *= 1 - ie;
+        const glintT = sub(2950, 3450);
+        stackF.emissive.setRGB(0.25 * Math.sin(Math.PI * glintT), 0.18 * Math.sin(Math.PI * glintT), 0.06 * Math.sin(Math.PI * glintT));
+        // handover glow (1.5–2.1s)
+        const c1 = sub(1500, 2100);
+        touchGlow.position.set(Q.x, Q.y + 0.06, Q.z + 0.05); touchGlow.scale.setScalar(0.1 + 0.18 * c1);
+        touchGlow.material.opacity *= c1 > 0 && c1 < 1 ? Math.sin(Math.PI * c1) : 0;
+        // fold arrows (1.6–2.5s)
+        const fa = sub(1600, 2500);
+        arrows.position.set(Q.x, Q.y + 0.08, Q.z + 0.03); arrows.rotation.z = -fa * 2.4;
+        arrowMat.opacity *= fa > 0 && fa < 1 ? Math.sin(Math.PI * fa) : 0;
+        // smart scan (2.6–3.5s)
+        const sc = sub(2600, 3500), scV = sc > 0 && sc < 1 ? Math.sin(Math.PI * sc) : 0, sp = stackG.position;
+        scanRing.position.set(sp.x, sp.y - 0.03 + (0.5 - 0.5 * Math.cos(sc * TAU * 2)) * 0.065, sp.z);
+        scanMat.opacity *= scV;
+        hud.position.set(sp.x, sp.y, sp.z + 0.1); hudMat.opacity *= scV;
+        // light traces: faint during the scan, strong while the garment is taken in (3.45–4.3s)
+        const intakeV = tt > 3450 && tt < 4300 ? Math.sin(Math.PI * (tt - 3450) / 850) : 0;
+        beams.position.set(sp.x, Q.y + 0.05, sp.z);
+        beams.children.forEach((bm, i) => (bm.position.y = 0.45 + Math.sin(clock * 0.004 + i * 1.7) * 0.03));
+        beamMat.opacity *= Math.max(scV * 0.3, intakeV);
       }
 
       /* washing machine: drum turns, pauses and reverses like a real wash cycle */
-      const u2 = pinO(o2, 530, 108);
+      const u2 = O2_SCENE ? pinO(o2, 530, 108) : 0;
       if (u2) {
         o2Tilt.rotation.set(rx * 2.2, ry * 2.2, 0);
         holeMat.size = 0.028 * u2; bubbleMat.size = 0.03 * u2;

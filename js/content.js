@@ -14,6 +14,9 @@ window.LOOP_CONTENT = {
   hero: {
     eyebrow: "The Robotic Laundry Revolution",
     tagline: "The Fabric Future",
+    /* Looping video shown inside the first O of the big logo (black background, square).
+       Replace the file to change the animation; set to "" for a plain ring. */
+    o1Video: "",
     headline: "Laundry, re-engineered for the next hundred years.",
     sub: "AI-powered machines, eco fabric care and a 24/7 automated system — designed so your clothes come back better than they left.",
     primary: { label: "Get early access", href: "#contact" },

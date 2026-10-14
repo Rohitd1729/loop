@@ -136,7 +136,7 @@
         : "") +
       draw(`<path d="M9 0V231H125"/>`, 18, 0) +
       draw(`<circle cx="275" cy="120" r="111" transform="rotate(-90 275 120)"/>`, 18, 0.15, "o1-ring") +
-      (hero ? handover(275, 120, gid) : "") +
+      "" +
       roboticO(530, 120, animated) +
       draw(`<path d="M699 240V9H790A61.5 61.5 0 0 1 790 132H699"/>`, 18, 0.3) +
       (hero && animated
@@ -152,6 +152,17 @@
     const kind = el.dataset.logo;
     if (kind === "o") el.innerHTML = `<svg class="logo-svg" viewBox="0 0 244 244">${roboticO(122, 122, false)}</svg>`;
     else el.innerHTML = wordmark(kind === "hero" && !reduced, kind === "hero");
+  });
+
+  // Optional artwork playing inside the first O (a looping MP4 on a black background).
+  // Set hero.o1Video in content.js; leave it empty for a plain ring.
+  const o1Video = C.hero && C.hero.o1Video;
+  if (o1Video) $$('[data-logo="hero"]').forEach((el) => {
+    const box = document.createElement("div");
+    box.className = "o1-media";
+    box.setAttribute("aria-hidden", "true");
+    box.innerHTML = `<video muted loop playsinline preload="auto"${reduced ? "" : " autoplay"} src="${esc(o1Video)}"></video>`;
+    el.appendChild(box);
   });
 
   /* ------------------------------------------------------------------------
@@ -538,7 +549,7 @@
     const detail = 1 - clamp(m * 3), cross = clamp(m * 6);
     // before the first loop the scene rests in its frame-0 pose (robot waiting, human off-stage)
     const film = c < 0 ? 0 : c < FILM ? c : -1;
-    L.robot.style.opacity = film < 0 ? 1 - cross : detail;
+    if (L.robot) L.robot.style.opacity = film < 0 ? 1 - cross : detail;
     L.inner.forEach((g) => (g.style.opacity = detail));
     L.o1.style.opacity = 1 - cross;
     L.shell.style.opacity = 1 - cross;
