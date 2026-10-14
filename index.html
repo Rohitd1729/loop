@@ -24,7 +24,6 @@
     <div class="preloader__meta"><span>Initialising loop</span><span class="preloader__pct">000</span></div>
   </div>
 
-  <div class="cursor" aria-hidden="true"><span></span></div>
   <div class="grain" aria-hidden="true"></div>
 
   <!-- Announcement -->
@@ -193,7 +192,7 @@
           </div>
         </div>
       </div>
-      <div class="updates__rail"></div>
+      <div class="updates__rail" tabindex="0" aria-label="Updates, drag or scroll sideways"></div>
     </section>
 
     <!-- CONTACT -->
@@ -207,8 +206,8 @@
             <div><span class="mono">Follow</span><div class="contact__socials"></div></div>
           </div>
           <form class="contact__form" novalidate>
-            <label><span class="mono">Name</span><input name="name" required autocomplete="name"></label>
-            <label><span class="mono">Phone</span><input name="phone" type="tel" required autocomplete="tel"></label>
+            <label><span class="mono">Name</span><input name="name" required autocomplete="name"><small class="field__error" aria-live="polite"></small></label>
+            <label><span class="mono">Phone</span><input name="phone" type="tel" required autocomplete="tel" inputmode="tel"><small class="field__error" aria-live="polite"></small></label>
             <label><span class="mono">City</span><input name="city" autocomplete="address-level2"></label>
             <fieldset>
               <legend class="mono">I'm interested in</legend>

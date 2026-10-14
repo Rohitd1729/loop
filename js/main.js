@@ -187,7 +187,7 @@
     `<svg viewBox="-50 -50 100 100"><circle r="44" fill="none" stroke="currentColor" stroke-width="1.5"/><ellipse rx="18" ry="44" fill="none" stroke="currentColor" stroke-width="1"/><path d="M-44 0H44M-38-22H38M-38 22H38" fill="none" stroke="currentColor" stroke-width="1"/><circle cx="26" cy="-20" r="3.5" fill="currentColor"/></svg>`
   ];
   $(".pillars__grid").innerHTML = (C.pillars || []).map((p, i) => `
-    <article class="pillar reveal" style="--i:${i}">
+    <article class="pillar reveal${i === 0 ? " pillar--lead" : ""}" style="--i:${i}">
       <div class="pillar__code mono"><span>${esc(p.code)}</span><span>0${i + 1}</span></div>
       <div class="pillar__icon">${icons[i % icons.length]}</div>
       <h3>${esc(p.title)}</h3><p>${esc(p.text)}</p>
@@ -230,7 +230,10 @@
   function renderUpdates(list) {
     updates = [...list].filter((u) => u && u.title).sort((a, b) => (String(a.date) < String(b.date) ? 1 : -1));
     const rail = $(".updates__rail");
-    if (!updates.length) { rail.innerHTML = `<p class="updates__empty mono">No updates yet.</p>`; return; }
+    if (!updates.length) {
+      rail.innerHTML = `<div class="updates__empty"><span class="mono">Nothing posted yet</span><p>News from LOOP (store openings, offers, franchise updates) will appear here.</p></div>`;
+      return;
+    }
     rail.innerHTML = updates.map((u, i) => {
       const fresh = u.date && (Date.now() - new Date(u.date + "T00:00:00")) / 864e5 <= 14;
       const more = u.body && u.body.trim();
@@ -257,13 +260,30 @@
       .map((para) => `<p>${esc(para).replace(/\n/g, "<br>")}</p>`).join("");
     dialog.showModal();
     dialog.scrollTop = 0;
+    morphDialog(true);
   }
+  // The article grows out of the card that opened it and shrinks back into it.
+  let origin = null;
+  function morphDialog(opening) {
+    const box = dialog.getBoundingClientRect();
+    const from = origin ? origin.getBoundingClientRect() : null;
+    const frames = reduced || !from
+      ? [{ opacity: 0 }, { opacity: 1 }]
+      : [{ opacity: 0, transform: `translate(${(from.left + from.width / 2) - (box.left + box.width / 2)}px, ${(from.top + from.height / 2) - (box.top + box.height / 2)}px) scale(${Math.min(from.width / box.width, 0.9).toFixed(3)})` },
+         { opacity: 1, transform: "none" }];
+    const anim = dialog.animate(opening ? frames : frames.slice().reverse(), { duration: reduced ? 160 : 420, easing: opening ? "cubic-bezier(.2,.8,.2,1)" : "cubic-bezier(.8,.2,.8,.2)", fill: "both" });
+    anim.onfinish = () => { if (!opening) dialog.close(); anim.cancel(); };
+  }
+  const closeArticle = () => (dialog.open ? morphDialog(false) : null);
   $(".updates__rail").addEventListener("click", (e) => {
     const card = e.target.closest(".update.has-more");
-    if (card) openArticle(updates[+card.dataset.i]);
+    if (card && !railDrag.moved) { origin = card; openArticle(updates[+card.dataset.i]); }
   });
-  dialog.addEventListener("click", (e) => { if (e.target === dialog || e.target.closest(".article__close")) dialog.close(); });
+  dialog.addEventListener("click", (e) => { if (e.target === dialog || e.target.closest(".article__close")) closeArticle(); });
+  dialog.addEventListener("cancel", (e) => { e.preventDefault(); closeArticle(); });
 
+  $(".updates__rail").innerHTML = Array.from({ length: 3 }, () =>
+    `<div class="update update--skeleton" aria-hidden="true"><div class="update__media"></div><div class="update__body"><i></i><i></i><i></i></div></div>`).join("");
   fetch("content/updates.json", { cache: "no-store" })
     .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
     .then((data) => { renderAnnouncement(data.announcement); renderUpdates(data.updates || []); })
@@ -273,9 +293,63 @@
       $(".updates__rail").innerHTML = `<p class="updates__empty mono">Updates appear when the site is online.</p>`;
     });
 
+  /* Updates rail, Apple-style: 1:1 drag that respects the grab point, release velocity
+     projected forward to pick the snap card, a critically damped spring that starts at the
+     pointer's speed, and rubber-band resistance past either end. Touch keeps native scrolling. */
+  const rail = $(".updates__rail");
+  const railDrag = { on: false, moved: false, x0: 0, s0: 0, hist: [], over: 0, raf: 0 };
+  const project = (v, d = 0.99) => ((v / 1000) * d) / (1 - d); // 0.99 = short, controlled throw
+  const rubber = (o, dim, c = 0.55) => (o * dim * c) / (dim + c * Math.abs(o));
+  const snaps = () => $$(".update", rail).map((c) => c.offsetLeft - parseFloat(getComputedStyle(rail).paddingLeft));
+  const setOver = (o) => { railDrag.over = o; rail.style.transform = o ? `translateX(${(-rubber(o, rail.clientWidth)).toFixed(2)}px)` : ""; };
+  function springTo(target, v0) {
+    cancelAnimationFrame(railDrag.raf);
+    const max = Math.max(0, rail.scrollWidth - rail.clientWidth), goal = clamp(target, 0, max);
+    const k = Math.pow((2 * Math.PI) / 0.75, 2), c = 2 * Math.sqrt(k); // response 0.75 s, damping 1.0
+    let x = rail.scrollLeft + railDrag.over, v = v0, last = performance.now();
+    rail.style.scrollSnapType = "none";
+    (function step(now) {
+      const dt = Math.min(0.032, (now - last) / 1000); last = now;
+      v += (-k * (x - goal) - c * v) * dt; x += v * dt;
+      setOver(x < 0 ? x : x > max ? x - max : 0);
+      rail.scrollLeft = clamp(x, 0, max);
+      if (Math.abs(x - goal) > 0.5 || Math.abs(v) > 5) railDrag.raf = requestAnimationFrame(step);
+      else { rail.scrollLeft = goal; setOver(0); rail.style.scrollSnapType = ""; }
+    })(last);
+  }
+  const nearest = (pos) => snaps().reduce((a, b) => (Math.abs(b - pos) < Math.abs(a - pos) ? b : a), 0);
+  rail.addEventListener("pointerdown", (e) => {
+    if (e.pointerType !== "mouse" || e.button !== 0) return;
+    cancelAnimationFrame(railDrag.raf);
+    Object.assign(railDrag, { on: true, moved: false, x0: e.clientX, s0: rail.scrollLeft + railDrag.over, hist: [[e.clientX, e.timeStamp]] });
+  });
+  addEventListener("pointermove", (e) => {
+    if (!railDrag.on) return;
+    const dx = e.clientX - railDrag.x0;
+    if (!railDrag.moved && Math.abs(dx) < 8) return; // small threshold before committing to a drag
+    if (!railDrag.moved) { railDrag.moved = true; rail.classList.add("is-dragging"); rail.style.scrollSnapType = "none"; }
+    const max = rail.scrollWidth - rail.clientWidth, want = railDrag.s0 - dx;
+    setOver(want < 0 ? want : want > max ? want - max : 0);
+    rail.scrollLeft = clamp(want, 0, max);
+    railDrag.hist.push([e.clientX, e.timeStamp]);
+    if (railDrag.hist.length > 6) railDrag.hist.shift();
+  });
+  addEventListener("pointerup", () => {
+    if (!railDrag.on) return;
+    railDrag.on = false;
+    rail.classList.remove("is-dragging");
+    if (!railDrag.moved) return;
+    const h = railDrag.hist, a = h[0], b = h[h.length - 1], dt = Math.max(1, b[1] - a[1]);
+    const v = -((b[0] - a[0]) / dt) * 1000; // scroll velocity, px/s
+    // a flick moves at most two cards from where the drag started
+    const list = snaps(), start = list.indexOf(nearest(railDrag.s0)), land = list.indexOf(nearest(rail.scrollLeft + railDrag.over + project(v)));
+    springTo(list[clamp(land, start - 2, start + 2)] ?? 0, clamp(v, -2500, 2500));
+    setTimeout(() => (railDrag.moved = false), 0);
+  });
+  rail.addEventListener("dragstart", (e) => e.preventDefault());
   $$(".updates__nav button").forEach((b) => b.addEventListener("click", () => {
-    const rail = $(".updates__rail"), card = $(".update", rail);
-    rail.scrollBy({ left: (card ? card.offsetWidth + 24 : 320) * +b.dataset.dir, behavior: "smooth" });
+    const list = snaps(), here = list.indexOf(nearest(rail.scrollLeft));
+    springTo(list[clamp(here + +b.dataset.dir, 0, list.length - 1)] ?? 0, 0);
   }));
 
   // Contact
@@ -759,7 +833,7 @@
   if (!reduced) requestAnimationFrame(frame); else drawCycle(0);
 
   /* ------------------------------------------------------------------------
-     9. MENU, CURSOR, MAGNETIC BUTTONS, PILLAR LIGHT
+     9. MENU, MAGNETIC BUTTONS, PILLAR LIGHT
      ------------------------------------------------------------------------ */
   const burger = $(".nav__burger"), menu = $(".menu");
   const setMenu = (open) => {
@@ -773,17 +847,6 @@
   $$("a", menu).forEach((a) => a.addEventListener("click", () => setMenu(false)));
 
   if (fine && !reduced) {
-    const cur = $(".cursor");
-    let cx = innerWidth / 2, cy = innerHeight / 2, tx = cx, ty = cy;
-    addEventListener("pointermove", (e) => { tx = e.clientX; ty = e.clientY; cur.classList.remove("is-hidden"); });
-    document.addEventListener("pointerleave", () => cur.classList.add("is-hidden"));
-    (function move() {
-      cx = lerp(cx, tx, 0.2); cy = lerp(cy, ty, 0.2);
-      cur.style.transform = `translate3d(${cx}px, ${cy}px, 0)`;
-      requestAnimationFrame(move);
-    })();
-    document.addEventListener("pointerover", (e) => cur.classList.toggle("is-hover", !!e.target.closest("a, button, label, .service, .update")));
-
     $$(".magnetic").forEach((el) => {
       el.addEventListener("pointermove", (e) => {
         const r = el.getBoundingClientRect();
@@ -797,24 +860,38 @@
       el.style.setProperty("--mx", e.clientX - r.left + "px");
       el.style.setProperty("--my", e.clientY - r.top + "px");
     }));
-  } else {
-    $(".cursor").remove();
   }
 
   /* ------------------------------------------------------------------------
      10. CONTACT FORM — opens a pre-filled WhatsApp chat (no server needed)
      ------------------------------------------------------------------------ */
   const form = $(".contact__form"), msg = $(".contact__msg");
+  // Inline validation: checked when a field is left, then live while it is corrected.
+  const rules = {
+    name: (v) => (v.trim().length < 2 ? "Enter your name." : ""),
+    phone: (v) => { const d = v.replace(/\D/g, ""); return !d ? "Enter a phone number." : d.length < 10 ? "That number looks too short." : ""; }
+  };
+  const check = (input) => {
+    const err = rules[input.name](input.value), out = input.parentElement.querySelector(".field__error");
+    input.classList.toggle("is-invalid", !!err); input.setAttribute("aria-invalid", !!err);
+    if (out) out.textContent = err;
+    return !err;
+  };
+  Object.keys(rules).forEach((n) => {
+    const input = form.elements[n];
+    input.addEventListener("blur", () => { input.dataset.touched = "1"; check(input); });
+    input.addEventListener("input", () => input.dataset.touched && check(input));
+  });
   form.addEventListener("submit", (e) => {
     e.preventDefault();
     const f = new FormData(form);
     const name = (f.get("name") || "").trim(), phone = (f.get("phone") || "").trim();
-    form.elements.name.classList.toggle("is-invalid", !name);
-    form.elements.phone.classList.toggle("is-invalid", phone.replace(/\D/g, "").length < 8);
-    if (!name || phone.replace(/\D/g, "").length < 8) { msg.textContent = "Add your name and a valid phone number."; return; }
+    const ok = Object.keys(rules).map((n) => { form.elements[n].dataset.touched = "1"; return check(form.elements[n]); }).every(Boolean);
+    if (!ok) { msg.textContent = ""; form.querySelector(".is-invalid").focus(); return; }
     const text = `Hi LOOP, I'm ${name} (${phone})${f.get("city") ? " from " + f.get("city") : ""}. I'm interested in: ${f.get("topic")}.`;
     window.open(`https://wa.me/${ct.whatsapp}?text=${encodeURIComponent(text)}`, "_blank", "noopener");
-    msg.textContent = "Opening WhatsApp…";
+    msg.textContent = "Opening WhatsApp. Your message is ready to send.";
     form.reset();
+    Object.keys(rules).forEach((n) => delete form.elements[n].dataset.touched);
   });
 })();
