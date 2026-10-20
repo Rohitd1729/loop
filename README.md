@@ -33,3 +33,18 @@ Updates are sorted by date automatically; posts from the last 14 days show a "Ne
 
 Updates are loaded with `fetch`, which browsers block when you double-click `index.html`.
 Run a tiny server instead, from this folder: `python -m http.server`, then open http://localhost:8000.
+
+## Project checks
+
+This is still a dependency-free static site, but the repository now exposes a small
+repeatable command set:
+
+```bash
+npm run check
+npm run preview
+python tools/build-globe-map.py
+```
+
+`npm run check` validates the required project files, JavaScript syntax, and JSON
+content. The globe build command requires Pillow and regenerates the three derived
+globe assets in `assets/`.

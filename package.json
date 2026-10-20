@@ -1,0 +1,11 @@
+{
+  "name": "loop-website",
+  "version": "1.0.0",
+  "private": true,
+  "description": "LOOP static landing page",
+  "scripts": {
+    "check": "node tools/check-project.mjs",
+    "preview": "python -m http.server 8000",
+    "build:globe": "python tools/build-globe-map.py"
+  }
+}

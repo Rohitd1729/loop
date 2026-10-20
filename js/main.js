@@ -487,8 +487,9 @@
   const order = [shapes.squircle, shapes.gear, shapes.wave, shapes.hex];
   const morphPaths = $$(".cycle__stage .m");
   const stepEls = $$(".cycle__steps li");
-  const cycleEl = $(".cycle"), idxEl = $(".cycle__idx"), labelEl = $(".cycle__label"), progEl = $(".cycle__progress span");
+  const cycleEl = $(".cycle"), idxEl = $(".cycle__idx"), cycleNum = $(".cycle__num"), labelEl = $(".cycle__label"), progEl = $(".cycle__progress span");
   const tickG = $(".cycle__ticks"), cycleVideoWindow = $(".cycle__video-window"), cycleVideoTrack = $(".cycle__video-track"), cycleVideos = $$(".cycle__video", cycleVideoTrack);
+  const cycleStage = $(".cycle__stage");
   tickG.innerHTML = Array.from({ length: 72 }, (_, i) => {
     const a = (i / 72) * TAU, r0 = i % 6 === 0 ? 178 : 184, r1 = 192;
     return `<line x1="${(r0 * Math.cos(a)).toFixed(1)}" y1="${(r0 * Math.sin(a)).toFixed(1)}" x2="${(r1 * Math.cos(a)).toFixed(1)}" y2="${(r1 * Math.sin(a)).toFixed(1)}"/>`;
@@ -499,23 +500,21 @@
     if (!video) return;
     cycleVideos.forEach((item) => { if (item !== video) item.pause(); });
     video.dataset.scrollProgress = String(progress);
-    if (video.readyState < 1 || !Number.isFinite(video.duration)) return;
-    const target = clamp(progress) * Math.max(0, video.duration - 0.04);
-    if (Math.abs(video.currentTime - target) > 0.35) video.currentTime = target;
+    if (reduced || video.readyState < 1 || !Number.isFinite(video.duration)) return;
     video.play().catch(() => {});
   }
   cycleVideos.forEach((video) => video.addEventListener("loadedmetadata", () => {
     if (video.classList.contains("is-active")) {
       const step = cycleVideos.indexOf(video);
-      startCycleVideo(step, Number(video.dataset.scrollProgress || clamp(cycleP * steps.length - step)));
+      startCycleVideo(step, Number(video.dataset.scrollProgress || 0));
     }
   }, { once: true }));
   new IntersectionObserver(([e]) => {
     cycleVisible = e.isIntersecting;
     if (!cycleVisible) cycleVideos.forEach((video) => video.pause());
     else if (!reduced) {
-      const step = Math.min(steps.length - 1, Math.floor(cycleP * steps.length));
-      startCycleVideo(step, clamp(cycleP * steps.length - step));
+      const step = Math.min(steps.length - 1, Math.round(cycleP * (steps.length - 1)));
+      startCycleVideo(step, 0);
     }
   }).observe(cycleEl);
 
@@ -528,10 +527,56 @@
     return r;
   }
   function drawCycle(t) {
-    if (cycleVideoWindow) {
-      cycleVideoWindow.style.setProperty("--cycle-x", `${((0.5 - cycleP) * 40).toFixed(2)}px`);
-      cycleVideoWindow.style.setProperty("--cycle-zoom", (1.14 - cycleP * 0.14).toFixed(3));
+    const phase = clamp(cycleP) * Math.max(0, steps.length - 1);
+    const step = Math.min(steps.length - 1, Math.max(0, Math.round(phase)));
+
+    // The cards are persistent objects on a four-position circular track. The
+    // phase is continuous; only the editorial state changes when a card reaches
+    // the center of the track.
+    if (cycleVideoWindow && cycleVideos.length) {
+      const cardWidth = cycleVideoWindow.clientWidth || cycleStage?.clientWidth || 1;
+      const travel = cardWidth * .38;
+      const cardRatio = parseFloat(getComputedStyle(cycleVideoWindow).getPropertyValue("--cycle-card-size")) || .72;
+      let activeCard = null;
+      cycleVideos.forEach((video, i) => {
+        let d = i - phase;
+        while (d > steps.length / 2) d -= steps.length;
+        while (d < -steps.length / 2) d += steps.length;
+        const distance = Math.min(Math.abs(d), 2);
+        const front = (1 + Math.cos(distance * Math.PI / 2)) / 2;
+        const isActive = i === step;
+        const x = Math.sin(d * Math.PI / 4) * travel;
+        const y = (1 - front) * Math.min(28, cardWidth * .06);
+        const scale = .46 + front * .54;
+        // Keep the focused clip fully opaque throughout the handoff. Side clips
+        // stay as quiet previews and cannot show through the main tile.
+        const opacity = isActive ? 1 : .16 + front * .84;
+        const brightness = isActive ? 1 : .38 + front * .2;
+        const saturation = isActive ? .94 : .38 + front * .2;
+        const vignette = .56 - front * .38;
+        const rotateY = -d * 12;
+        const rotateZ = -d * 1.5;
+        video.style.transform = `translate3d(calc(-50% + ${x.toFixed(2)}px), calc(-50% + ${y.toFixed(2)}px), 0) scale(${scale.toFixed(4)}) rotateY(${rotateY.toFixed(2)}deg) rotateZ(${rotateZ.toFixed(2)}deg)`;
+        video.style.opacity = opacity.toFixed(3);
+        video.style.filter = `brightness(${brightness.toFixed(3)}) saturate(${saturation.toFixed(3)}) contrast(1.05)`;
+        video.style.boxShadow = `inset 0 0 ${Math.round(cardWidth * .08)}px rgba(0, 0, 0, ${vignette.toFixed(3)}), 0 28px 90px rgba(0, 0, 0, ${(.18 + front * .24).toFixed(3)})`;
+        video.style.zIndex = isActive ? "1000" : String(Math.round(front * 100 - distance));
+        video.classList.toggle("is-active", isActive);
+        if (i === step) activeCard = { x, y, scale, ratio: cardRatio };
+      });
+
+      if (activeCard && cycleNum && labelEl) {
+        const activeSize = cardWidth * activeCard.ratio * activeCard.scale;
+        const activeLeft = activeCard.x - activeSize / 2;
+        const activeTop = activeCard.y - activeSize / 2;
+        cycleNum.style.left = `calc(50% + ${(activeLeft + 18).toFixed(2)}px)`;
+        cycleNum.style.top = `calc(50% + ${(activeTop + 18).toFixed(2)}px)`;
+        labelEl.style.left = `calc(50% + ${activeCard.x.toFixed(2)}px)`;
+        labelEl.style.top = `calc(50% + ${(activeCard.y + activeSize / 2 + 12).toFixed(2)}px)`;
+        labelEl.style.bottom = "auto";
+      }
     }
+
     morphPaths.forEach((path, j) => {
       const scale = 1 - j * 0.15, rot = (j % 2 ? -1 : 1) * t * 0.00006 * (j + 1) + j * 0.3 + cycleP * Math.PI * (j % 2 ? -1 : 1);
       let d = "";
@@ -543,18 +588,13 @@
       path.setAttribute("d", d + "Z");
     });
     tickG.setAttribute("transform", `rotate(${(cycleP * 180).toFixed(2)})`);
-    const step = Math.min(steps.length - 1, Math.floor(cycleP * steps.length));
     const stepChanged = step !== lastStep;
     if (stepChanged) {
       lastStep = step;
       stepEls.forEach((li, i) => li.classList.toggle("is-active", i === step));
       idxEl.textContent = String(step + 1).padStart(2, "0");
       labelEl.textContent = steps[step] ? `◦ ${steps[step].title}` : "";
-      cycleVideos.forEach((video, i) => {
-        video.classList.toggle("is-active", i === step);
-        if (i !== step) video.pause();
-      });
-      if (!reduced && cycleVisible) startCycleVideo(step, clamp(cycleP * steps.length - step));
+      if (cycleVisible) startCycleVideo(step, 0);
     }
     progEl.style.setProperty("--p", cycleP.toFixed(4));
   }

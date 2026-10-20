@@ -609,7 +609,52 @@
   // the second O is the original arc reactor. O1_SCENE / O2_SCENE bring back the 3D scenes.
   const O1_SCENE = false, O2_SCENE = false;
 
+  // Keep the active logo enhancement lightweight while the experimental O scenes are off.
+  // The full builder below remains available for a future opt-in scene, but it should not
+  // allocate all of its disabled geometry and materials on every page load.
+  function createLogoOrbitOnly(root) {
+    const logoEl = $('[data-logo="hero"]', root), svg = logoEl && $("svg", logoEl);
+    if (!svg) return () => {};
+
+    const orbitBack = new T.Group(), orbitFront = new T.Group();
+    bg.add(orbitBack); fg.add(orbitFront);
+    const ringMat = (opacity) => new T.MeshBasicMaterial({ color: IVORY, transparent: true, opacity, depthWrite: false });
+    const backHalf = new T.Mesh(new T.TorusGeometry(1, 0.0018, 6, 200, Math.PI), ringMat(0.32));
+    const frontHalf = new T.Mesh(new T.TorusGeometry(1, 0.0018, 6, 200, Math.PI), ringMat(0.5));
+    frontHalf.rotation.z = Math.PI;
+    const backHalf2 = new T.Mesh(new T.TorusGeometry(1.035, 0.001, 6, 200, Math.PI), ringMat(0.16));
+    const frontHalf2 = new T.Mesh(new T.TorusGeometry(1.035, 0.001, 6, 200, Math.PI), ringMat(0.26));
+    frontHalf2.rotation.z = Math.PI;
+    orbitBack.add(backHalf, backHalf2); orbitFront.add(frontHalf, frontHalf2);
+
+    const comet = [orbitBack, orbitFront].map((group) => Array.from({ length: 12 }, (_, k) => {
+      const sprite = new T.Sprite(new T.SpriteMaterial({ map: dotTex, color: k ? BRASS : 0xf4ead8, blending: T.AdditiveBlending, depthWrite: false }));
+      sprite.scale.setScalar(k ? 0.03 * (1 - k / 14) : 0.045);
+      group.add(sprite);
+      return sprite;
+    }));
+
+    return function update(t) {
+      const sr = pin(orbitFront, svg);
+      orbitBack.visible = !!sr;
+      if (!sr) return;
+      orbitBack.position.copy(orbitFront.position);
+      const radius = (sr.width / 2) * wpp * 1.07;
+      [orbitBack, orbitFront].forEach((group) => {
+        group.scale.setScalar(radius);
+        group.rotation.set(-1.43, 0, -0.05);
+      });
+      const head = reduced ? 4.2 : t * 0.00032;
+      comet.forEach((list, side) => list.forEach((sprite, j) => {
+        const angle = head - j * 0.022;
+        sprite.position.set(Math.cos(angle), Math.sin(angle), 0);
+        sprite.visible = side === 1 ? Math.sin(angle) < 0 : Math.sin(angle) >= 0;
+      }));
+    };
+  }
+
   function createLogo3D(root) {
+    if (!O1_SCENE && !O2_SCENE) return createLogoOrbitOnly(root);
     const logoEl = $('[data-logo="hero"]', root), svg = logoEl && $("svg", logoEl);
     if (!svg) return () => {};
     const fadeEl = $(".hero__inner", root); // the hero fades its logo on scroll; follow it
@@ -1213,14 +1258,29 @@
     createPillarIcons()
   ];
   let prev = performance.now();
+  let raf = 0;
   function frame(now) {
+    raf = 0;
+    if (document.hidden) return;
     const dt = Math.min(0.05, (now - prev) / 1000);
     prev = now;
     const t = reduced ? 0 : now;
     updates.forEach((u) => u(t, reduced ? 0 : dt));
     bgR.render(bg, camera);
     fgR.render(fg, camera);
-    requestAnimationFrame(frame);
+    raf = requestAnimationFrame(frame);
   }
-  requestAnimationFrame(frame);
+  const schedule = () => {
+    if (!document.hidden && !raf) raf = requestAnimationFrame(frame);
+  };
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+      if (raf) cancelAnimationFrame(raf);
+      raf = 0;
+      return;
+    }
+    prev = performance.now();
+    schedule();
+  });
+  schedule();
 })();
