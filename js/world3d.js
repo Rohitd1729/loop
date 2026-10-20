@@ -173,124 +173,307 @@
     };
   }
 
-  /* ---------- 3. the wash drum ("How it works") ---------- */
+  /* ---------- 3. the LOOP robotic wash drum ("How it works") ----------
+     One reusable scene, four reversible scroll stages (p = 0..1 across the section):
+       Pickup 0–.25 · Robotic wash .25–.5 · Eco dry .5–.75 · Fold & return .75–1 (hold)
+     Scale: 1 unit = drum radius (0.78 = steel drum, 1.0 = door rim). Origin: drum centre. +Z = toward viewer.
+     Framing: drum fills the .cycle__stage box; frame tilt y -0.30 / x 0.14 (±0.05 pointer parallax).
+     Named nodes (window.LOOP_DRUM.root.getObjectByName): LOOP_Washer > Washer_Frame > Drum, Rotor,
+       Rotor_Hub, Rotor_Axle, Rotor_Arm_0-3, Paddle_0-3, Door_Rim, Door_Gasket, Door_Glass,
+       Garment_Shirt / _Trousers / _Sock_L / _Sock_R / _Towel, Lamp. Camera = shared scene camera.
+     Cloth: procedural approximation (subdivided two-layer meshes; true hinge folds, bend, twist, ripples,
+     inertial trailing) driven by a light 2-D tumble sim of each garment against the drum wall and paddles. */
   function createDrum(anchor, section) {
-    const group = new T.Group(), tilt = new T.Group(), spin = new T.Group();
-    group.add(tilt); tilt.add(spin); fg.add(group);
-    const metal = new T.MeshStandardMaterial({ color: 0xbfb8ac, metalness: 0.2, roughness: 0.55 });
-    const bezel = new T.Mesh(new T.TorusGeometry(1, 0.016, 12, 180), metal);
-    bezel.position.z = 0.46;
-    tilt.add(bezel);
-    const inner = new T.Mesh(new T.TorusGeometry(0.9, 0.008, 8, 160), new T.MeshBasicMaterial({ color: BRASS }));
-    inner.position.z = 0.46;
-    tilt.add(inner);
-    const tickPts = [];
-    for (let i = 0; i < 72; i++) {
-      const a = (i / 72) * TAU, r0 = i % 6 ? 0.935 : 0.915;
-      tickPts.push(new T.Vector3(Math.cos(a) * r0, Math.sin(a) * r0, 0.46), new T.Vector3(Math.cos(a) * 0.97, Math.sin(a) * 0.97, 0.46));
-    }
-    tilt.add(new T.LineSegments(new T.BufferGeometry().setFromPoints(tickPts), lineMat(IVORY, 0.45)));
-    // glass door
-    const glass = new T.Mesh(new T.CircleGeometry(0.78, 64), new T.MeshBasicMaterial({ color: IVORY, transparent: true, opacity: 0.035, depthWrite: false }));
-    glass.position.z = 0.455;
-    tilt.add(glass);
-    const glint = new T.Line(new T.BufferGeometry().setFromPoints(Array.from({ length: 30 }, (_, i) => {
-      const a = 2.2 + (i / 29) * 0.9;
-      return new T.Vector3(Math.cos(a) * 0.66, Math.sin(a) * 0.66, 0.46);
-    })), lineMat(IVORY, 0.5));
-    tilt.add(glint);
-    // the drum itself (spins): rims, perforations, baffles, back plate
-    spin.add(new T.Line(circlePts(0.78, 0.45), lineMat(IVORY, 0.8)));
-    spin.add(new T.Line(circlePts(0.78, -0.45), lineMat(IVORY, 0.45)));
-    spin.add(new T.Line(circlePts(0.5, -0.45, 96), lineMat(IVORY, 0.25)));
-    spin.add(new T.Line(circlePts(0.22, -0.45, 64), lineMat(BRASS, 0.6)));
-    const struct = [];
-    for (let i = 0; i < 6; i++) {
-      const a = (i / 6) * TAU;
-      struct.push(new T.Vector3(Math.cos(a) * 0.22, Math.sin(a) * 0.22, -0.45), new T.Vector3(Math.cos(a) * 0.78, Math.sin(a) * 0.78, -0.45));
-    }
-    for (let i = 0; i < 3; i++) { // baffles along the depth
-      const a = (i / 3) * TAU + 0.5;
-      for (const rr of [0.78, 0.66]) struct.push(new T.Vector3(Math.cos(a) * rr, Math.sin(a) * rr, -0.45), new T.Vector3(Math.cos(a) * rr, Math.sin(a) * rr, 0.45));
-      struct.push(new T.Vector3(Math.cos(a) * 0.66, Math.sin(a) * 0.66, 0.45), new T.Vector3(Math.cos(a) * 0.78, Math.sin(a) * 0.78, 0.45));
-    }
-    spin.add(new T.LineSegments(new T.BufferGeometry().setFromPoints(struct), lineMat(IVORY, 0.4)));
-    const holes = [];
-    for (let i = 0; i < 44; i++) for (let d = 0; d < 7; d++) {
-      const a = (i / 44) * TAU + (d % 2) * 0.07;
-      holes.push(new T.Vector3(Math.cos(a) * 0.78, Math.sin(a) * 0.78, -0.38 + d * 0.127));
-    }
-    const holeMat = new T.PointsMaterial({ size: 0.05, map: dotTex, color: IVORY, transparent: true, opacity: 0.55, depthWrite: false });
-    spin.add(new T.Points(new T.BufferGeometry().setFromPoints(holes), holeMat));
+    const group = new T.Group(), tilt = new T.Group(), spin = new T.Group(), rotor = new T.Group();
+    group.name = "LOOP_Washer"; tilt.name = "Washer_Frame"; spin.name = "Drum"; rotor.name = "Rotor";
+    group.add(tilt); tilt.add(spin); tilt.add(rotor); fg.add(group);
+    const lamp = new T.PointLight(0xfff1dc, 0.7, 0); lamp.name = "Lamp"; lamp.position.set(0.3, 0.5, 1.4); tilt.add(lamp);
 
-    // garments: soft bent cloth pieces
-    const cloths = [0, 1, 2, 3].map((i) => {
-      const geo = new T.PlaneGeometry(0.28, 0.2, 9, 6);
-      const mesh = new T.Mesh(geo, new T.MeshStandardMaterial({ color: i % 2 ? 0xf4efe6 : 0xe2dbcf, roughness: 0.92, side: T.DoubleSide, flatShading: true }));
-      mesh.userData.base = Float32Array.from(geo.attributes.position.array);
-      tilt.add(mesh);
-      return mesh;
+    /* ----- procedural textures + materials ----- */
+    const cv = (w, h, draw) => { const c = document.createElement("canvas"); c.width = w; c.height = h; draw(c.getContext("2d"), w, h); return c; };
+    const tex = (c, rx = 1, ry = 1) => { const t = new T.CanvasTexture(c); t.wrapS = t.wrapT = T.RepeatWrapping; t.repeat.set(rx, ry); t.anisotropy = 4; return t; };
+    let env = null; // soft studio reflections so brushed metal reads as metal
+    try {
+      const et = new T.CanvasTexture(cv(512, 256, (g, w, h) => {
+        const gr = g.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, "#35332f"); gr.addColorStop(0.5, "#111112"); gr.addColorStop(1, "#050505");
+        g.fillStyle = gr; g.fillRect(0, 0, w, h);
+        [[60, 40, 130, 50, "#f3eee4"], [300, 30, 150, 36, "#e9e4da"], [200, 120, 60, 90, "#8c7a55"], [440, 90, 50, 60, "#cfcac0"]].forEach(([x, y, a, b, c]) => { g.fillStyle = c; g.fillRect(x, y, a, b); });
+      }));
+      et.mapping = T.EquirectangularReflectionMapping;
+      const pm = new T.PMREMGenerator(fgR); env = pm.fromEquirectangular(et).texture; pm.dispose(); et.dispose();
+    } catch (e) { env = null; }
+    const brushC = cv(256, 256, (g, w, h) => {
+      g.fillStyle = "#808080"; g.fillRect(0, 0, w, h);
+      for (let i = 0; i < 900; i++) { g.fillStyle = Math.random() < 0.5 ? "rgba(255,255,255,.13)" : "rgba(0,0,0,.15)"; g.fillRect(Math.random() * w, Math.random() * h, 20 + Math.random() * 200, 1); }
     });
-    // water / warm air particles
-    const PN = 130, ppos = new Float32Array(PN * 3);
-    const pgeo = new T.BufferGeometry();
-    pgeo.setAttribute("position", new T.BufferAttribute(ppos, 3));
-    const pmat = new T.PointsMaterial({ size: 0.04, map: dotTex, color: IVORY, transparent: true, opacity: 0, depthWrite: false, blending: T.AdditiveBlending });
-    const parts = new T.Points(pgeo, pmat);
-    parts.frustumCulled = false;
-    tilt.add(parts);
+    const steel = (o = {}) => new T.MeshStandardMaterial(Object.assign({ color: 0xc9c6c0, metalness: 0.92, roughness: 0.38, bumpMap: tex(brushC, 1, 3), bumpScale: 0.6, envMap: env, envMapIntensity: 1.1 }, o));
+    const graphite = new T.MeshStandardMaterial({ color: 0x2a2c30, metalness: 0.75, roughness: 0.5, envMap: env, envMapIntensity: 0.9 });
+    const rubber = new T.MeshStandardMaterial({ color: 0x0c0c0d, roughness: 0.78, metalness: 0.05 });
+    const gold = new T.MeshStandardMaterial({ color: 0xb89a63, metalness: 0.9, roughness: 0.35, envMap: env });
+    const led = new T.MeshBasicMaterial({ color: BRASS.clone() });
+    const holeC = cv(128, 128, (g, w, h) => { // perforated sheet: evenly spaced holes with a lit lower rim
+      g.fillStyle = "#bdbab4"; g.fillRect(0, 0, w, h);
+      for (let i = 0; i < 260; i++) { g.fillStyle = Math.random() < 0.5 ? "rgba(255,255,255,.07)" : "rgba(0,0,0,.08)"; g.fillRect(Math.random() * w, Math.random() * h, 12 + Math.random() * 60, 1); }
+      [[32, 32], [96, 32], [0, 96], [64, 96], [128, 96]].forEach(([x, y]) => {
+        g.fillStyle = "#050506"; g.beginPath(); g.arc(x, y, 11, 0, TAU); g.fill();
+        g.strokeStyle = "rgba(255,255,255,.4)"; g.lineWidth = 2; g.beginPath(); g.arc(x, y, 12, 2.4, 4.4); g.stroke();
+      });
+    });
+    const drumTex = tex(holeC, 30, 5);
+    const rbox = (w, h, d, r = 0.012) => { // rounded-edge bar: soft, machined, never sharp
+      const s = new T.Shape(), x = -w / 2, y = -h / 2;
+      s.moveTo(x + r, y); s.lineTo(x + w - r, y); s.quadraticCurveTo(x + w, y, x + w, y + r); s.lineTo(x + w, y + h - r); s.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+      s.lineTo(x + r, y + h); s.quadraticCurveTo(x, y + h, x, y + h - r); s.lineTo(x, y + r); s.quadraticCurveTo(x, y, x + r, y);
+      const g = new T.ExtrudeGeometry(s, { depth: d, bevelEnabled: true, bevelSize: 0.006, bevelThickness: 0.006, bevelSegments: 2, curveSegments: 4 });
+      g.translate(0, 0, -d / 2); return g;
+    };
+    const add = (parent, geo, mat, name, x = 0, y = 0, z = 0) => { const m = new T.Mesh(geo, mat); m.name = name; m.position.set(x, y, z); parent.add(m); return m; };
+    const alongZ = (g) => { g.rotateX(Math.PI / 2); return g; };
 
-    const SPEED = [0.5, 4.6, 1.8, 0.18], GRAV = [0.85, 0.05, 0.45, 0.9];
-    const st = { angle: 0, speed: 0.5, grav: 0.85 };
+    /* ----- door: rim, gasket, ticks, domed dark glass ----- */
+    add(tilt, new T.TorusGeometry(1, 0.03, 16, 180), steel(), "Door_Rim", 0, 0, 0.5);
+    add(tilt, new T.TorusGeometry(0.9, 0.008, 8, 160), new T.MeshBasicMaterial({ color: BRASS }), "Door_Accent", 0, 0, 0.5);
+    add(tilt, new T.TorusGeometry(0.855, 0.07, 16, 120), rubber, "Door_Gasket", 0, 0, 0.43);
+    const tickPts = [];
+    for (let i = 0; i < 72; i++) { const a = (i / 72) * TAU, r0 = i % 6 ? 0.935 : 0.915; tickPts.push(new T.Vector3(Math.cos(a) * r0, Math.sin(a) * r0, 0.5), new T.Vector3(Math.cos(a) * 0.97, Math.sin(a) * 0.97, 0.5)); }
+    tilt.add(new T.LineSegments(new T.BufferGeometry().setFromPoints(tickPts), lineMat(IVORY, 0.45)));
+    const dome = new T.SphereGeometry(3, 56, 10, 0, TAU, 0, Math.asin(0.78 / 3)); dome.rotateX(Math.PI / 2); dome.translate(0, 0, -2.427);
+    const glass = add(tilt, dome, new T.MeshPhysicalMaterial({ color: 0x0b0e11, metalness: 0, roughness: 0.06, transparent: true, opacity: 0.2, envMap: env, envMapIntensity: 1.3, depthWrite: false, side: T.DoubleSide }), "Door_Glass");
+    glass.renderOrder = 5;
+    const glint = new T.Line(new T.BufferGeometry().setFromPoints(Array.from({ length: 30 }, (_, i) => { const a = 2.2 + (i / 29) * 0.9; return new T.Vector3(Math.cos(a) * 0.66, Math.sin(a) * 0.66, 0.58); })), lineMat(IVORY, 0.4));
+    tilt.add(glint);
+
+    /* ----- drum (spins): perforated shell, lips, back plate, bearing, water film ----- */
+    add(spin, alongZ(new T.CylinderGeometry(0.78, 0.78, 0.9, 96, 1, true)), steel({ map: drumTex, bumpMap: drumTex, bumpScale: 2, side: T.BackSide, metalness: 0.8, roughness: 0.45 }), "Drum_Shell");
+    add(spin, new T.TorusGeometry(0.78, 0.022, 12, 120), steel(), "Drum_Lip_Front", 0, 0, 0.45);
+    add(spin, new T.TorusGeometry(0.78, 0.022, 12, 120), steel(), "Drum_Lip_Back", 0, 0, -0.45);
+    add(spin, new T.CircleGeometry(0.78, 64), graphite, "Drum_Back_Plate", 0, 0, -0.452);
+    [0.5, 0.33].forEach((r, i) => add(spin, new T.TorusGeometry(r, 0.008, 8, 96), steel(), "Drum_Back_Ring_" + i, 0, 0, -0.44));
+    add(spin, alongZ(new T.CylinderGeometry(0.17, 0.17, 0.06, 40)), graphite, "Drum_Bearing", 0, 0, -0.43);
+    add(spin, new T.TorusGeometry(0.17, 0.008, 8, 48), gold, "Drum_Bearing_Ring", 0, 0, -0.4);
+    const streak = tex(cv(256, 64, (g, w) => { for (let i = 0; i < 70; i++) { const x = Math.random() * w, y = Math.random() * 64, l = 10 + Math.random() * 40, gr = g.createLinearGradient(x, y, x + l, y); gr.addColorStop(0, "rgba(255,255,255,0)"); gr.addColorStop(0.5, "rgba(255,255,255,.7)"); gr.addColorStop(1, "rgba(255,255,255,0)"); g.fillStyle = gr; g.fillRect(x, y, l, 1.5); } }), 4, 1);
+    const filmMat = new T.MeshBasicMaterial({ map: streak, color: 0xdfeaf0, transparent: true, opacity: 0, blending: T.AdditiveBlending, depthWrite: false, side: T.BackSide });
+    add(spin, alongZ(new T.CylinderGeometry(0.772, 0.772, 0.86, 64, 1, true)), filmMat, "Water_Film");
+
+    /* ----- robotic rotor: coaxial with the drum, own speed. hub + axle + 4 arms + 4 curved lifters ----- */
+    add(rotor, alongZ(new T.CylinderGeometry(0.035, 0.035, 0.14, 24)), steel(), "Rotor_Axle", 0, 0, -0.44);
+    add(rotor, alongZ(new T.CylinderGeometry(0.12, 0.12, 0.12, 40)), graphite, "Rotor_Hub", 0, 0, -0.37);
+    add(rotor, alongZ(new T.CylinderGeometry(0.085, 0.085, 0.03, 40)), steel(), "Rotor_Hub_Cap", 0, 0, -0.3);
+    add(rotor, new T.TorusGeometry(0.1, 0.007, 8, 48), gold, "Rotor_Hub_Ring", 0, 0, -0.31);
+    for (let k = 0; k < 4; k++) { // indicator lights inset in the hub cap
+      const a = k * Math.PI / 2 + Math.PI / 4, l = add(rotor, new T.SphereGeometry(0.013, 12, 8), led, "Rotor_Light_" + k, Math.cos(a) * 0.055, Math.sin(a) * 0.055, -0.283); l.scale.z = 0.5;
+      const b = add(rotor, alongZ(new T.CylinderGeometry(0.013, 0.013, 0.02, 6)), steel(), "Rotor_Hub_Bolt_" + k, Math.cos(a) * 0.1, Math.sin(a) * 0.1, -0.305);
+    }
+    const ps = new T.Shape(), pcx = 0.74, pcy = 0.3; // curved lifter profile: scoop faces the direction of travel
+    ps.absarc(pcx, pcy, 0.325, Math.PI, 1.5 * Math.PI, false); ps.absarc(pcx, pcy, 0.275, 1.5 * Math.PI, Math.PI, true);
+    const padGeo = new T.ExtrudeGeometry(ps, { depth: 0.62, bevelEnabled: true, bevelSize: 0.012, bevelThickness: 0.012, bevelSegments: 3, curveSegments: 20 });
+    padGeo.translate(0, 0, -0.38);
+    const armGeo = rbox(0.58, 0.06, 0.04), braceGeo = rbox(0.28, 0.03, 0.03), ledBar = new T.BoxGeometry(0.05, 0.012, 0.006);
+    for (let k = 0; k < 4; k++) {
+      const arm = new T.Group(); arm.name = "Rotor_Arm_" + k; arm.rotation.z = k * Math.PI / 2; rotor.add(arm);
+      add(arm, armGeo, steel(), "Arm_Bar", 0.41, 0, -0.36);
+      add(arm, alongZ(new T.CylinderGeometry(0.045, 0.045, 0.07, 24)), steel(), "Arm_Joint", 0.7, 0, -0.36);
+      add(arm, alongZ(new T.CylinderGeometry(0.02, 0.02, 0.012, 6)), gold, "Arm_Joint_Bolt", 0.7, 0, -0.32);
+      [0.3, 0.52].forEach((x, i) => add(arm, alongZ(new T.CylinderGeometry(0.014, 0.014, 0.02, 6)), steel(), "Arm_Bolt_" + i, x, 0, -0.335));
+      add(arm, ledBar, led, "Arm_Light", 0.45, 0, -0.337);
+      const br = add(arm, braceGeo, graphite, "Arm_Brace", 0.55, 0.09, -0.34); br.rotation.z = 0.55;
+      add(arm, padGeo, graphite, "Paddle_" + k);
+      add(arm, ledBar, led, "Paddle_Light_" + k, 0.66, 0.24, 0.22).rotation.z = 0.9;
+    }
+
+    /* ----- garments: two-layer subdivided cloth meshes with woven + stitched textures ----- */
+    const SPAN = 0.64, WV = 256, X = (x) => ((x + SPAN / 2) / SPAN) * WV, Y = (y) => ((SPAN / 2 - y) / SPAN) * WV;
+    const fabric = (base, seams, o = {}) => cv(WV, WV, (g) => {
+      g.fillStyle = base; g.fillRect(0, 0, WV, WV);
+      for (let i = 0; i < WV; i += 2) { g.fillStyle = `rgba(0,0,0,${0.05 + Math.random() * 0.05})`; g.fillRect(i, 0, 1, WV); g.fillStyle = `rgba(255,255,255,${0.04 + Math.random() * 0.05})`; g.fillRect(0, i + 1, WV, 1); }
+      if (o.terry) for (let i = 0; i < 2600; i++) { g.fillStyle = Math.random() < 0.5 ? "rgba(255,255,255,.1)" : "rgba(0,0,0,.12)"; g.beginPath(); g.arc(Math.random() * WV, Math.random() * WV, 1 + Math.random() * 1.3, 0, TAU); g.fill(); }
+      (o.ribs || []).forEach(([ya, yb]) => { for (let x = 0; x < WV; x += 3) { g.fillStyle = "rgba(0,0,0,.22)"; g.fillRect(x, Y(ya), 1.5, Y(yb) - Y(ya)); } });
+      (o.patches || []).forEach(([cx, cy, rx, ry]) => { g.fillStyle = "rgba(0,0,0,.2)"; g.beginPath(); g.ellipse(X(cx), Y(cy), rx * WV / SPAN, ry * WV / SPAN, 0, 0, TAU); g.fill(); });
+      g.setLineDash([4, 3]); g.lineWidth = 1.4; g.strokeStyle = o.stitch || "rgba(70,70,75,.6)";
+      seams.forEach((pts) => { g.beginPath(); pts.forEach(([x, y], i) => (i ? g.lineTo(X(x), Y(y)) : g.moveTo(X(x), Y(y)))); g.stroke(); });
+    });
+    const poly = (pts) => { const s = new T.Shape(); s.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) s.lineTo(pts[i][0], pts[i][1]); s.closePath(); return s; };
+    const shirt = new T.Shape();
+    shirt.moveTo(-0.075, 0.25); shirt.quadraticCurveTo(0, 0.15, 0.075, 0.25); shirt.lineTo(0.17, 0.225); shirt.lineTo(0.285, 0.075); shirt.lineTo(0.215, 0.0); shirt.lineTo(0.16, 0.06);
+    shirt.lineTo(0.16, -0.26); shirt.quadraticCurveTo(0, -0.29, -0.16, -0.26); shirt.lineTo(-0.16, 0.06); shirt.lineTo(-0.215, 0.0); shirt.lineTo(-0.285, 0.075); shirt.lineTo(-0.17, 0.225); shirt.closePath();
+    const sock = new T.Shape();
+    sock.moveTo(-0.105, 0.27); sock.quadraticCurveTo(0, 0.25, 0.105, 0.27); sock.lineTo(0.09, -0.08); sock.quadraticCurveTo(0.1, -0.16, 0.21, -0.2); sock.quadraticCurveTo(0.27, -0.23, 0.22, -0.28);
+    sock.quadraticCurveTo(0.05, -0.31, -0.13, -0.27); sock.quadraticCurveTo(-0.18, -0.22, -0.11, -0.16); sock.closePath();
+    const towel = new T.Shape();
+    towel.moveTo(-0.2, 0.26); towel.quadraticCurveTo(-0.22, 0, -0.2, -0.27); towel.quadraticCurveTo(0, -0.29, 0.2, -0.27); towel.quadraticCurveTo(0.22, 0, 0.2, 0.26); towel.quadraticCurveTo(0, 0.28, -0.2, 0.26); towel.closePath();
+    const sockSeams = [[[-0.1, 0.16], [0.1, 0.16]], [[-0.1, 0.05], [0.085, 0.05]]];
+    // type: 0 shirt, 1 trousers, 2 sock, 3 towel. folds are [pointX, pointY, normalX, normalY] on the flat garment.
+    const DEFS = [
+      { name: "Garment_Shirt", type: 0, shape: shirt, lane: 0.12, rz0: 0.15, sp: 1,
+        tex: fabric("#f1f1ef", [[[-0.075, 0.25], [-0.04, 0.19], [0, 0.17], [0.04, 0.19], [0.075, 0.25]], [[-0.075, 0.25], [-0.17, 0.225]], [[0.075, 0.25], [0.17, 0.225]], [[-0.16, 0.06], [-0.16, -0.26]], [[0.16, 0.06], [0.16, -0.26]], [[-0.15, -0.23], [0.15, -0.23]], [[-0.15, -0.215], [0.15, -0.215]], [[-0.205, 0.012], [-0.272, 0.083]], [[0.205, 0.012], [0.272, 0.083]]]),
+        mask: (x, y) => Math.max(smooth(0.16, 0.27, Math.abs(x)), smooth(-0.16, -0.27, y)),
+        folds: [[-0.16, 0, -1, 0], [0.16, 0, 1, 0], [0, -0.015, 0, -1]], stack: [0, -0.33, 0.2, -0.4, 0] },
+      { name: "Garment_Trousers", type: 1, shape: poly([[-0.19, 0.27], [0.19, 0.27], [0.17, -0.28], [0.045, -0.28], [0, -0.045], [-0.045, -0.28], [-0.17, -0.28]]), lane: 0, rz0: -0.1, sp: 0.9,
+        tex: fabric("#1c1d1f", [[[-0.19, 0.2], [0.19, 0.2]], [[0, 0.2], [0, -0.04]], [[-0.18, 0.2], [-0.17, -0.27]], [[0.18, 0.2], [0.17, -0.27]], [[-0.165, -0.25], [-0.048, -0.25]], [[0.165, -0.25], [0.048, -0.25]]], { stitch: "rgba(200,200,205,.4)", ribs: [[0.27, 0.2]] }),
+        mask: (x, y) => smooth(-0.1, -0.28, y), folds: [[0, 0, 1, 0], [0, 0, 0, -1]], stack: [0, -0.4, 0.15, -0.4, 0] },
+      { name: "Garment_Sock_L", type: 2, shape: sock, lane: 0.08, rz0: 0.5, sp: 1.2, tex: fabric("#8f9195", sockSeams, { ribs: [[0.27, 0.16]], patches: [[-0.08, -0.2, 0.05, 0.05], [0.2, -0.25, 0.05, 0.035]], stitch: "rgba(235,235,235,.5)" }),
+        mask: (x, y) => Math.max(smooth(0.15, 0.27, y) * 0.5, y < -0.12 ? smooth(0.08, 0.24, x) : 0), folds: [[0, -0.09, 0, -1], [0.04, 0, 1, 0]], stack: [-0.1, -0.27, 0.22, -0.4, 0.05] },
+      { name: "Garment_Sock_R", type: 2, shape: sock, lane: -0.06, rz0: -0.6, sp: 0.8, tex: fabric("#b9babd", sockSeams, { ribs: [[0.27, 0.16]], patches: [[-0.08, -0.2, 0.05, 0.05], [0.2, -0.25, 0.05, 0.035]] }),
+        mask: (x, y) => Math.max(smooth(0.15, 0.27, y) * 0.5, y < -0.12 ? smooth(0.08, 0.24, x) : 0), folds: [[0, -0.09, 0, -1], [0.04, 0, 1, 0]], stack: [0.1, -0.27, 0.22, -0.4, -0.05] },
+      { name: "Garment_Towel", type: 3, shape: towel, lane: -0.12, rz0: 0.3, sp: 0.7, tex: fabric("#5a5c61", [[[-0.17, 0.22], [0.17, 0.22], [0.17, -0.24], [-0.17, -0.24], [-0.17, 0.22]], [[-0.2, 0.15], [0.2, 0.15]], [[-0.2, 0.12], [0.2, 0.12]]], { terry: true, stitch: "rgba(225,225,225,.35)" }),
+        mask: (x, y) => smooth(1.0, 1.9, Math.abs(x) / 0.2 + Math.abs(y) / 0.27), folds: [[0, -0.09, 0, -1], [0, 0.09, 0, 1], [0, 0, 1, 0]], stack: [0, -0.46, 0.1, -0.4, 0] }
+    ];
+    const pip = (pl, x, y) => { let c = false; for (let i = 0, j = pl.length - 1; i < pl.length; j = i++) { const a = pl[i], b = pl[j]; if ((a.y > y) !== (b.y > y) && x < ((b.x - a.x) * (y - a.y)) / (b.y - a.y) + a.x) c = !c; } return c; };
+    const nearest = (pl, x, y) => {
+      let bx = x, by = y, bd = 1e9;
+      for (let i = 0, j = pl.length - 1; i < pl.length; j = i++) {
+        const a = pl[j], b = pl[i], dx = b.x - a.x, dy = b.y - a.y, t = clamp(((x - a.x) * dx + (y - a.y) * dy) / (dx * dx + dy * dy || 1)), px = a.x + dx * t, py = a.y + dy * t, dd = (px - x) ** 2 + (py - y) ** 2;
+        if (dd < bd) { bd = dd; bx = px; by = py; }
+      }
+      return [bx, by];
+    };
+    const TMP = [0, 0, 0];
+    function foldPt(d, f, x, y, z, o) { // rounded hinge folds, applied in order
+      for (let j = 0; j < d.folds.length; j++) {
+        const fj = f[j]; if (fj <= 0) continue;
+        const F = d.folds[j], dd = (x - F[0]) * F[2] + (y - F[1]) * F[3];
+        if (dd <= 0) continue;
+        const w = Math.min(1, dd / 0.05), th = Math.PI * fj * w * w * (3 - 2 * w), co = Math.cos(th), si = Math.sin(th);
+        const nn = dd * co - z * si, zz = dd * si + z * co + 0.012 * fj * w, tt = -(x - F[0]) * F[3] + (y - F[1]) * F[2];
+        x = F[0] - F[3] * tt + F[2] * nn; y = F[1] + F[2] * tt + F[3] * nn; z = zz;
+      }
+      o[0] = x; o[1] = y; o[2] = z;
+    }
+    function makeCloth(d, idx) {
+      const pl = d.shape.getPoints(10), n = Math.round(SPAN / (small ? 0.038 : 0.027)), st = SPAN / n, g0 = -SPAN / 2;
+      const map = new Map(), vx = [], vy = [], tri = [];
+      const gv = (i, j) => { const k = i * 1000 + j; let v = map.get(k); if (v === undefined) { v = vx.length; map.set(k, v); let x = g0 + i * st, y = g0 + j * st; if (!pip(pl, x, y)) [x, y] = nearest(pl, x, y); vx.push(x); vy.push(y); } return v; };
+      for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+        if (!pip(pl, g0 + (i + 0.5) * st, g0 + (j + 0.5) * st)) continue;
+        const a = gv(i, j), b = gv(i + 1, j), c = gv(i + 1, j + 1), e = gv(i, j + 1); tri.push(a, b, c, a, c, e);
+      }
+      const nv = vx.length, N = nv * 2, TH = 0.007, bx = new Float32Array(N), by = new Float32Array(N), bz = new Float32Array(N), mask = new Float32Array(N), uv = new Float32Array(N * 2);
+      for (let v = 0; v < N; v++) {
+        const s = v < nv ? 1 : -1, k = v % nv;
+        bx[v] = vx[k]; by[v] = vy[k]; bz[v] = s * TH; mask[v] = d.mask(vx[k], vy[k]); uv[v * 2] = (vx[k] + SPAN / 2) / SPAN; uv[v * 2 + 1] = (vy[k] + SPAN / 2) / SPAN;
+      }
+      const ind = new (N > 65535 ? Uint32Array : Uint16Array)(tri.length * 2);
+      for (let i = 0; i < tri.length; i += 3) { ind.set([tri[i], tri[i + 1], tri[i + 2]], i); ind.set([tri[i] + nv, tri[i + 2] + nv, tri[i + 1] + nv], tri.length + i); }
+      const geo = new T.BufferGeometry(), pos = new Float32Array(N * 3);
+      geo.setAttribute("position", new T.BufferAttribute(pos, 3).setUsage(T.DynamicDrawUsage)); geo.setAttribute("uv", new T.BufferAttribute(uv, 2)); geo.setIndex(new T.BufferAttribute(ind, 1));
+      const t = new T.CanvasTexture(d.tex); t.anisotropy = 4;
+      const mesh = new T.Mesh(geo, new T.MeshStandardMaterial({ map: t, bumpMap: t, bumpScale: 1.6, roughness: 0.95, metalness: 0, side: T.DoubleSide }));
+      mesh.name = d.name; mesh.frustumCulled = false; mesh.scale.setScalar(0.9); tilt.add(mesh);
+      const c = { def: d, mesh, geo, pos, N, bx, by, bz, mask, ph: idx * 1.9 + 0.4, sp: d.sp, off: [0, 0], lag: [0, 0, 0], lagV: [0, 0, 0], lv: [0, 0, 0] };
+      let x0 = 9, x1 = -9, y0 = 9, y1 = -9; // centre of the folded bundle so the stack sits where intended
+      for (let v = 0; v < N; v++) { foldPt(d, [1, 1, 1], bx[v], by[v], bz[v], TMP); x0 = Math.min(x0, TMP[0]); x1 = Math.max(x1, TMP[0]); y0 = Math.min(y0, TMP[1]); y1 = Math.max(y1, TMP[1]); }
+      c.off = [-(x0 + x1) / 2, -(y0 + y1) / 2];
+      return c;
+    }
+    // This presentation focuses on the washer hardware; omit garment meshes and their per-frame cloth simulation.
+    const C = [];
+    function deform(c, t, act, air, f, fa, lg) {
+      const d = c.def, P = c.pos, gl = 1 - fa, tt = t * 0.001, ph = c.ph, ty = d.type;
+      const kx = act * 0.9 * Math.sin(tt * 0.8 + ph) * gl, ky = act * 1.25 * Math.sin(tt * 0.6 + ph * 1.3) * gl, tw = act * 1.5 * Math.sin(tt * 0.7 + ph * 2) * gl;
+      const kL = ty === 1 ? act * (0.5 + 0.5 * Math.sin(tt * 1.1 + ph)) * gl : 0, kR = ty === 1 ? act * (0.5 + 0.5 * Math.sin(tt * 0.9 + ph + 1.7)) * gl : 0;
+      for (let v = 0; v < c.N; v++) {
+        const bx = c.bx[v], by = c.by[v], m = c.mask[v];
+        let x = bx, y = by, z = c.bz[v];
+        if (fa > 0) { foldPt(d, f, x, y, z, TMP); x = TMP[0] + c.off[0] * fa; y = TMP[1] + c.off[1] * fa; z = TMP[2]; }
+        if (gl > 0.001) {
+          z += 0.5 * (kx * x * x + ky * y * y);
+          if (tw > 0.01 || tw < -0.01) { const q = tw * y, cs = Math.cos(q), sn = Math.sin(q), x2 = x * cs + z * sn; z = z * cs - x * sn; x = x2; }
+          if (ty === 1) { const dk = -0.06 - y; if (dk > 0) { const wk = Math.min(1, dk / 0.06), a = (x < 0 ? kL : kR) * wk * wk * (3 - 2 * wk), cs = Math.cos(a), sn = Math.sin(a); y = -0.06 - dk * cs; z += dk * sn; } } // knees bend
+          const ed = Math.min(1, (Math.abs(bx) + Math.abs(by)) / 0.45);
+          const wv = Math.sin(bx * 17 + tt * 4.2 * c.sp + ph) * 0.6 + Math.sin(by * 13 - tt * 3.5 * c.sp + ph * 1.7) * 0.5;
+          z += (0.3 + 0.7 * ed + m) * wv * 0.05 * act * gl + m * air * Math.sin(tt * 9 + bx * 22 + ph) * 0.03 * gl; // ripples + airflow flutter
+          x += lg[0] * m * gl; y += lg[1] * m * gl; z += lg[2] * m * gl; // hems / sleeves trail
+        }
+        P[v * 3] = x; P[v * 3 + 1] = y; P[v * 3 + 2] = z;
+      }
+      c.geo.attributes.position.needsUpdate = true; c.geo.computeVertexNormals();
+    }
+
+    /* ----- water droplets + warm airflow (kept inside the drum, understated) ----- */
+    const PN = 90, wpos = new Float32Array(PN * 3), apos = new Float32Array(60 * 3);
+    const mkPts = (arr, col) => { const g = new T.BufferGeometry(); g.setAttribute("position", new T.BufferAttribute(arr, 3)); const m = new T.PointsMaterial({ size: 0.04, map: dotTex, color: col, transparent: true, opacity: 0, depthWrite: false, blending: T.AdditiveBlending }); const p = new T.Points(g, m); p.frustumCulled = false; tilt.add(p); return p; };
+    const drops = mkPts(wpos, 0xdfeaf0), airP = mkPts(apos, BRASS);
+    drops.name = "Water_Droplets"; airP.name = "Airflow";
+
+    /* ----- tumble sim state ----- */
+    const RC = 0.52, HOME = [[-0.32, -0.18], [0.04, -0.36], [0.34, -0.16], [0.3, -0.42], [-0.2, -0.44]];
+    const B = C.map((c, i) => ({ x: HOME[i][0], y: HOME[i][1], vx: 0, vy: 0, pvx: 0, pvy: 0, rz: c.def.rz0, wz: 0 }));
+    const st = { angle: 0, rot: 0, wd: 0.12, wr: 0.1 };
+    const ramp = (a, p) => { const x = clamp(p * 4 - 0.5, 0, 3), i = Math.min(3, Math.floor(x)), f = smooth(0, 1, x - i); return lerp(a[i], a[Math.min(3, i + 1)], f); };
+    const qi = new T.Quaternion(), v3 = new T.Vector3();
+    window.LOOP_DRUM = {
+      root: group, camera, units: "1 = drum radius, origin = drum centre, +Z toward viewer",
+      stages: [{ name: "Pickup", p: [0, 0.25] }, { name: "Robotic wash", p: [0.25, 0.5] }, { name: "Eco dry", p: [0.5, 0.75] }, { name: "Fold & return", p: [0.75, 1] }],
+      exportGLB(cb) { if (!T.GLTFExporter) return console.warn("Load three/examples GLTFExporter (r128) to export."); new T.GLTFExporter().parse(group, cb, { binary: true }); }
+    };
+
     return function update(t, dt) {
       const r = pin(group, anchor);
       if (!r) return;
       const s = (Math.min(r.width, r.height) / 2) * wpp * 0.84;
-      group.scale.setScalar(s);
-      holeMat.size = 0.05 * s; pmat.size = 0.045 * s;
       const cr = section.getBoundingClientRect();
-      const p = clamp(-cr.top / (cr.height - innerHeight));
-      const seg = p * 4, step = Math.min(3, Math.floor(seg)), u = step === 3 ? clamp(seg - 3) : seg - step;
-      st.speed = lerp(st.speed, SPEED[step], 0.04);
-      st.grav = lerp(st.grav, GRAV[step], 0.05);
-      st.angle += st.speed * dt;
-      spin.rotation.z = st.angle;
-      tilt.rotation.y = -0.6 + p * 1.0 + mouse.nx * 0.08;
-      tilt.rotation.x = 0.32 - p * 0.18 + mouse.ny * 0.06;
-      warm.intensity = 1.2 + (step === 2 ? 1.4 * Math.sin(Math.PI * u) : 0);
+      const p = clamp(-cr.top / (cr.height - innerHeight)), R = (a) => ramp(a, p), tt = t * 0.001;
+      const zoom = R([1.3, 1.08, 1.08, 1]);
+      group.scale.setScalar(s * zoom); drops.material.size = 0.04 * s * zoom; airP.material.size = 0.045 * s * zoom;
+      const kk = 1 - Math.exp(-dt * 3.5);
+      st.wd = lerp(st.wd, R([0.12, 4.2, 1.8, 0]), kk); st.wr = lerp(st.wr, R([0.1, 5.0, 1.7, 0]), kk); // strongest rotation during robotic wash; settle for fold / return
+      st.angle += st.wd * dt; st.rot += st.wr * dt;
+      spin.rotation.z = st.angle; rotor.rotation.z = st.rot;
+      tilt.rotation.y = -0.48 + p * 0.9 + mouse.nx * 0.04; tilt.rotation.x = 0.14 + mouse.ny * 0.04;
+      const act = R([0.3, 1, 0.65, 0.2]), air = R([0, 0, 1, 0]), wash = R([0, 1, 0.25, 0]), gA = R([1.4, 3.8, 2.1, 3.2]), dragK = R([2.2, 0.7, 0.45, 1.8]);
+      const pickW = 1 - smooth(0.1, 0.24, p), wS = smooth(0, 0.55, clamp(p * 4 - 3)), u3 = clamp(p * 4 - 3);
+      led.color.copy(BRASS).multiplyScalar((0.3 + 0.7 * smooth(0, 0.3, Math.abs(st.wr) / 2.4)) * (0.75 + 0.25 * Math.sin(tt * 4)));
 
-      cloths.forEach((m, i) => {
-        const a = st.angle * 0.9 + (i * Math.PI) / 2, rad = 0.5 + 0.08 * Math.sin(st.angle * 1.7 + i * 2);
-        let x = Math.cos(a) * rad, y = Math.sin(a) * rad, z = (i - 1.5) * 0.17;
-        x = lerp(x, (i - 1.5) * 0.18, st.grav);
-        y = lerp(y, -0.5 + 0.03 * Math.sin(t * 0.002 + i), st.grav);
-        const drop = step === 0 ? smooth(i * 0.14, i * 0.14 + 0.45, u) : 1;  // pickup: garments drop in
-        y += (1 - drop) * 1.3;
-        const f = step === 3 ? smooth(0.12 + i * 0.08, 0.55 + i * 0.08, u) : 0; // fold & return: stack in front
-        x = lerp(x, 0, f); y = lerp(y, -0.32 + i * 0.07, f); z = lerp(z, 0.98, f);
-        m.position.set(x, y, z);
-        m.rotation.set(lerp(st.angle * 1.3 + i, -1.25, f), lerp(st.angle * 0.7 + i * 2, 0, f), lerp(i * 0.8, 0, f));
-        m.scale.set(lerp(1, 0.82, f) * Math.max(0.001, drop), lerp(1, 0.7, f) * Math.max(0.001, drop), 1);
-        const amp = lerp(0.05, 0.004, f) * (step === 1 ? 1.3 : 1), b = m.userData.base, pa = m.geometry.attributes.position.array;
-        for (let k = 0; k < pa.length; k += 3) {
-          pa[k + 2] = Math.sin(b[k] * 9 + t * 0.004 + i) * amp + Math.cos(b[k + 1] * 7 + t * 0.003) * amp * 0.5;
+      const SUB = 2, h = dt / SUB;
+      for (let q = 0; q < SUB && h > 0; q++) {
+        for (let i = 0; i < B.length; i++) {
+          const b = B[i];
+          b.vy -= gA * h; if (air > 0 && (i === 0 || i === 2 || i === 3)) b.vy += air * 0.9 * h; // airflow lifts the light pieces
+          const dg = Math.exp(-dragK * h); b.vx *= dg; b.vy *= dg;
+          if (pickW > 0.001) { b.vx += (HOME[i][0] + 0.03 * Math.sin(tt * 0.7 + i * 1.9) - b.x) * 7 * pickW * h; b.vy += (HOME[i][1] + 0.025 * Math.sin(tt * 0.9 + i * 2.3) - b.y) * 7 * pickW * h; }
+          const rr = Math.hypot(b.x, b.y), th = Math.atan2(b.y, b.x);
+          if (Math.abs(st.wr) > 0.15 && rr > 0.3) for (let k = 0; k < 4; k++) { // paddles scoop and lift whatever sits ahead of them
+            let dd = th - (st.rot + k * Math.PI / 2); dd -= TAU * Math.round(dd / TAU);
+            if (dd > 0.04 && dd < 0.65) { const kv = clamp(16 * Math.min(1, (0.65 - dd) / 0.3) * Math.min(1, (dd - 0.04) / 0.1) * h); b.vx += (-b.y * st.wr - b.vx) * kv; b.vy += (b.x * st.wr - b.vy) * kv; }
+          }
+          if (rr > RC - 0.05 && Math.abs(st.wd) > 0.02) { const nx = b.x / rr, ny = b.y / rr, dv = (st.wd * rr - (b.vx * -ny + b.vy * nx)) * clamp(8 * h); b.vx += -ny * dv; b.vy += nx * dv; } // wall friction drags the load
+          const ex = b.x / 0.36, ey = b.y / 0.25, e2 = ex * ex + ey * ey;
+          if (e2 < 1) { const pu = (1 - Math.sqrt(e2)) * 18 * h / (rr + 0.02); b.vx += b.x * pu; b.vy += b.y * pu; } // keep the step number clear
+          b.x += b.vx * h; b.y += b.vy * h;
+          const r2 = Math.hypot(b.x, b.y);
+          if (r2 > RC) { const nx = b.x / r2, ny = b.y / r2, vr = b.vx * nx + b.vy * ny; b.x = nx * RC; b.y = ny * RC; if (vr > 0) { b.vx -= nx * vr * 1.15; b.vy -= ny * vr * 1.15; } }
         }
-        m.geometry.attributes.position.needsUpdate = true;
-        m.geometry.computeVertexNormals();
+        for (let i = 0; i < B.length; i++) for (let j = i + 1; j < B.length; j++) {
+          const dx = B[i].x - B[j].x, dy = B[i].y - B[j].y, ds = Math.hypot(dx, dy);
+          if (ds < 0.27 && ds > 1e-4) { const pu = (0.27 - ds) * 6 * h / ds; B[i].vx += dx * pu; B[i].vy += dy * pu; B[j].vx -= dx * pu; B[j].vy -= dy * pu; }
+        }
+      }
+
+      C.forEach((c, i) => {
+        const b = B[i], d = c.def, m = c.mesh, K = d.stack;
+        const f = d.folds.map((_, j) => smooth(0.03 * i + 0.15 * j, 0.03 * i + 0.15 * j + 0.3, u3)), fa = f.reduce((x, y) => x + y, 0) / f.length;
+        if (dt > 0) {
+          const ax = (b.vx - b.pvx) / dt, ay = (b.vy - b.pvy) / dt; b.pvx = b.vx; b.pvy = b.vy;
+          const tgt = (-b.vx * 1.5 + (Math.hypot(b.x, b.y) > RC - 0.08 ? st.wd * 0.5 : 0)) * act;
+          b.wz = lerp(b.wz, tgt, 1 - Math.exp(-dt * 2)); b.rz += b.wz * dt;
+          b.rz = d.rz0 + ((b.rz - d.rz0 + Math.PI) % TAU + TAU) % TAU - Math.PI;
+          const calm = 1 - smooth(0.25, 0.6, act); b.rz += (d.rz0 - b.rz) * calm * dt * 1.5;
+          qi.copy(m.quaternion).invert();
+          v3.set(ax, ay + gA * 0.6, 0).applyQuaternion(qi); // trailing: inertial spring in the garment's own frame
+          for (let k = 0; k < 3; k++) { const a = k === 0 ? v3.x : k === 1 ? v3.y : v3.z; c.lagV[k] += (-a * 0.9 - 90 * c.lag[k] - 12 * c.lagV[k]) * dt; c.lag[k] = clamp(c.lag[k] + c.lagV[k] * dt, -0.08, 0.08); }
+        }
+        const rx = Math.sin(tt * 0.9 + c.ph) * 0.55 * act, ry = Math.cos(tt * 0.7 + c.ph * 1.3) * 0.5 * act, lane = d.lane + 0.03 * Math.sin(tt * 0.8 + c.ph * 2);
+        m.position.set(lerp(b.x, K[0], wS), lerp(b.y, K[1], wS), lerp(lane, K[2], wS));
+        m.rotation.set(lerp(rx, K[3], wS), lerp(ry, 0, wS), lerp(b.rz, K[4], wS));
+        c.lv[0] = c.lag[0] * 1.6; c.lv[1] = c.lag[1] * 1.6; c.lv[2] = c.lag[2] * 1.6;
+        if (!small || (Math.floor(t / 16) + i) % 2 === 0) deform(c, t, act, air, f, fa, c.lv);
       });
 
-      const wash = step === 1 ? smooth(0, 0.2, u) * (1 - smooth(0.85, 1, u)) : 0;
-      const dry = step === 2 ? smooth(0, 0.2, u) * (1 - smooth(0.85, 1, u)) : 0;
-      pmat.opacity = Math.max(wash, dry) * 0.9;
-      pmat.color.copy(dry > wash ? BRASS : IVORY);
-      for (let k = 0; k < PN; k++) {
-        const a = st.angle * (1.1 + (k % 5) * 0.08) + k * 2.4, rr = 0.15 + ((k * 7) % 11) / 11 * 0.58;
-        const rise = dry > wash ? (((t * 0.00025 + k * 0.137) % 1) * 1.3 - 0.65) : 0;
-        ppos[k * 3] = Math.cos(a) * rr;
-        ppos[k * 3 + 1] = dry > wash ? rise : Math.sin(a) * rr;
-        ppos[k * 3 + 2] = ((k * 13) % 17) / 17 * 0.8 - 0.4;
-      }
-      pgeo.attributes.position.needsUpdate = true;
+      filmMat.opacity = wash * 0.3; streak.offset.x -= st.wd * dt * 0.05;
+      drops.material.opacity = wash * 0.8; airP.material.opacity = air * 0.5;
+      for (let k = 0; k < PN; k++) { const a = st.angle * (1.05 + (k % 5) * 0.05) + k * 2.4, rr = 0.62 + ((k * 7) % 11) / 11 * 0.12; wpos[k * 3] = Math.cos(a) * rr; wpos[k * 3 + 1] = Math.sin(a) * rr - ((tt * 0.3 + k * 0.17) % 1) * 0.04; wpos[k * 3 + 2] = ((k * 13) % 17) / 17 * 0.8 - 0.4; }
+      for (let k = 0; k < 60; k++) { apos[k * 3] = ((k * 7) % 13) / 13 * 1.0 - 0.5; apos[k * 3 + 1] = ((tt * 0.12 + k * 0.137) % 1) * 1.1 - 0.55; apos[k * 3 + 2] = ((k * 11) % 17) / 17 * 0.7 - 0.3; }
+      drops.geometry.attributes.position.needsUpdate = true; airP.geometry.attributes.position.needsUpdate = true;
     };
   }
 
@@ -299,33 +482,64 @@
     const wire = (c, o) => new T.MeshBasicMaterial({ color: c, wireframe: true, transparent: true, opacity: o });
     const brassSolid = () => new T.MeshStandardMaterial({ color: BRASS, metalness: 0.6, roughness: 0.3 });
     const makers = [
-      () => { // robotic laundry tech: a geared drum with a brass core
-        const g = new T.Group(), ring = new T.Mesh(new T.TorusGeometry(0.36, 0.015, 6, 60), new T.MeshBasicMaterial({ color: BRASS }));
-        g.add(new T.Mesh(new T.TorusGeometry(0.62, 0.17, 6, 24), wire(IVORY, 0.26)), ring, new T.Mesh(new T.SphereGeometry(0.12, 16, 12), brassSolid()));
-        const teeth = [];
-        for (let i = 0; i < 16; i++) {
-          const a = (i / 16) * TAU;
-          teeth.push(new T.Vector3(Math.cos(a) * 0.8, Math.sin(a) * 0.8, 0), new T.Vector3(Math.cos(a) * 0.92, Math.sin(a) * 0.92, 0));
-        }
-        g.add(new T.LineSegments(new T.BufferGeometry().setFromPoints(teeth), lineMat(IVORY, 0.45)));
-        g.userData.tick = (t, sp) => { g.rotation.x = 0.55 + Math.sin(t * 0.0007) * 0.2; g.rotation.z += 0.004 * sp; ring.rotation.x = t * 0.002 * sp; };
+      () => { // robotic laundry tech: a front-loading washer with an active drum
+        const g = new T.Group();
+        const body = new T.LineSegments(new T.EdgesGeometry(new T.BoxGeometry(1.16, 1.38, 0.42)), lineMat(IVORY, 0.68));
+        body.position.y = -0.04;
+        const panel = new T.LineSegments(new T.EdgesGeometry(new T.BoxGeometry(0.92, 0.2, 0.012)), lineMat(IVORY, 0.48));
+        panel.position.set(0, 0.49, 0.22);
+        const dial = new T.Mesh(new T.TorusGeometry(0.065, 0.012, 6, 24), new T.MeshBasicMaterial({ color: BRASS }));
+        dial.position.set(-0.31, 0.49, 0.24);
+        const drum = new T.Group(); drum.position.set(0, -0.08, 0.24);
+        drum.add(new T.Mesh(new T.TorusGeometry(0.4, 0.055, 8, 48), new T.MeshBasicMaterial({ color: IVORY, transparent: true, opacity: 0.68 })));
+        drum.add(new T.Mesh(new T.TorusGeometry(0.31, 0.012, 6, 48), new T.MeshBasicMaterial({ color: BRASS, transparent: true, opacity: 0.9 })));
+        drum.add(new T.Mesh(new T.CircleGeometry(0.3, 40), new T.MeshBasicMaterial({ color: 0x151412, transparent: true, opacity: 0.84 })));
+        const sweep = new T.Mesh(new T.TorusGeometry(0.2, 0.009, 5, 40, Math.PI * 1.2), new T.MeshBasicMaterial({ color: IVORY, transparent: true, opacity: 0.55 }));
+        sweep.position.z = 0.012; drum.add(sweep);
+        g.add(body, panel, dial, drum);
+        g.userData.tick = (t, sp) => {
+          drum.rotation.z += 0.012 * sp;
+          g.rotation.y = Math.sin(t * 0.0006) * 0.08;
+          g.rotation.x = 0.06;
+        };
         return g;
       },
-      () => { // sustainable: a water droplet with a ripple
-        const g = new T.Group(), prof = [];
-        for (let i = 0; i <= 24; i++) { const a = (i / 24) * Math.PI; prof.push(new T.Vector2(0.62 * Math.sin(a) * Math.sin(a / 2), Math.cos(a) * 0.95)); }
-        const drop = new T.Mesh(new T.LatheGeometry(prof, 12), wire(IVORY, 0.26));
-        const core = new T.Mesh(new T.SphereGeometry(0.13, 16, 12), brassSolid());
-        const ripple = new T.Mesh(new T.TorusGeometry(0.5, 0.008, 6, 64), new T.MeshBasicMaterial({ color: BRASS, transparent: true }));
-        ripple.rotation.x = Math.PI / 2;
-        ripple.position.y = -0.98;
-        g.add(drop, core, ripple);
+      () => { // supplied sustainability mark with a dimensional leaf and orbit layered over it
+        const g = new T.Group();
+        const leafShape = new T.Shape();
+        leafShape.moveTo(0, 0.78);
+        leafShape.bezierCurveTo(-0.12, 0.54, -0.52, 0.2, -0.5, -0.08);
+        leafShape.bezierCurveTo(-0.47, -0.42, -0.15, -0.68, 0, -0.8);
+        leafShape.bezierCurveTo(0.15, -0.68, 0.47, -0.42, 0.5, -0.08);
+        leafShape.bezierCurveTo(0.52, 0.2, 0.12, 0.54, 0, 0.78);
+        const leafGeometry = new T.ShapeGeometry(leafShape, 28);
+        const leaf = new T.Mesh(leafGeometry, new T.MeshBasicMaterial({ color: IVORY, transparent: true, opacity: 0.11, side: T.DoubleSide, depthWrite: false }));
+        leaf.position.z = 0.055;
+        const outline = new T.LineSegments(new T.EdgesGeometry(leafGeometry), lineMat(IVORY, 0.58)); outline.position.z = 0.07;
+        const stem = new T.Line(new T.BufferGeometry().setFromPoints([new T.Vector3(0, 0.77, 0.09), new T.Vector3(0, -0.78, 0.09)]), lineMat(IVORY, 0.76));
+        const veinPoints = [
+          new T.Vector3(0, 0.34, 0.095), new T.Vector3(0.25, 0.61, 0.095),
+          new T.Vector3(0, 0.16, 0.095), new T.Vector3(0.48, 0.02, 0.095),
+          new T.Vector3(0, -0.12, 0.095), new T.Vector3(0.42, -0.38, 0.095),
+          new T.Vector3(0, 0.03, 0.095), new T.Vector3(-0.4, -0.32, 0.095)
+        ];
+        const veins = new T.LineSegments(new T.BufferGeometry().setFromPoints(veinPoints), lineMat(BRASS, 0.82));
+        const orbit = new T.Group();
+        const ring = new T.Mesh(new T.TorusGeometry(0.98, 0.012, 6, 120), new T.MeshBasicMaterial({ color: BRASS, transparent: true, opacity: 0.72 }));
+        const innerArc = new T.Mesh(new T.TorusGeometry(0.73, 0.006, 4, 96, Math.PI * 1.18), new T.MeshBasicMaterial({ color: BRASS, transparent: true, opacity: 0.72 }));
+        innerArc.rotation.z = 0.45;
+        const satellite = new T.Mesh(new T.SphereGeometry(0.055, 16, 12), brassSolid());
+        const satelliteRing = new T.Mesh(new T.TorusGeometry(0.055, 0.012, 6, 24), new T.MeshBasicMaterial({ color: BRASS }));
+        orbit.add(ring, innerArc, satellite, satelliteRing);
+        orbit.rotation.set(0.12, 0.06, 0);
+        g.add(leaf, outline, stem, veins, orbit);
         g.userData.tick = (t, sp) => {
-          drop.rotation.y += 0.006 * sp;
-          core.position.y = -0.35 + Math.sin(t * 0.002) * 0.08;
-          const k = (t * 0.0006 * sp) % 1;
-          ripple.scale.setScalar(0.4 + k * 1.2); ripple.material.opacity = 1 - k;
-          g.rotation.x = 0.25;
+          orbit.rotation.z += 0.0015 * sp;
+          orbit.rotation.y = 0.06 + Math.sin(t * 0.0007) * 0.035;
+          const a = t * 0.00035 * sp;
+          satellite.position.set(Math.cos(a + Math.PI * 1.25) * 0.98, Math.sin(a + Math.PI * 1.25) * 0.98, 0.025);
+          satelliteRing.position.set(Math.cos(a + Math.PI * 0.25) * 0.98, Math.sin(a + Math.PI * 0.25) * 0.98, 0.025);
+          leaf.rotation.y = Math.sin(t * 0.00065) * 0.035;
         };
         return g;
       },
@@ -807,10 +1021,9 @@
     };
   }
 
-  /* ---------- 4c. the LOOP store, as a scroll-driven 3D model ----------
-     Scroll: the store turns from a three-quarter view to face you, the facade and sign
-     light up, the glass doors slide open, the machines inside start spinning, and the
-     camera pushes in. Black, glass and white light only. */
+  /* ---------- 4c. retired store scene ----------
+     The storefront now uses its static photograph; this legacy builder is kept out of
+     the render loop so the section has no 3D model or scroll-driven store animation. */
   function createStore(anchor, section) {
     const group = new T.Group(), model = new T.Group();
     group.add(model); fg.add(group);
@@ -997,9 +1210,7 @@
     ...$$(".hero, .finale").map(createFabric),
     ...$$(".hero, .finale").map(createLogo3D),
     createDust(),
-    ...($(".cycle__stage") ? [createDrum($(".cycle__stage"), $(".cycle"))] : []),
-    createPillarIcons(),
-    ...($(".store__stage") ? [createStore($(".store__stage"), $(".store"))] : [])
+    createPillarIcons()
   ];
   let prev = performance.now();
   function frame(now) {

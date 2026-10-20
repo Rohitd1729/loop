@@ -55,7 +55,7 @@ window.LOOP_CONTENT = {
 
   /* Three brand pillars (from the brochure) */
   pillars: [
-    { title: "Robotic laundry tech", text: "AI-powered, self-cleaning, 24/7 automated systems.", code: "SYS-01" },
+    { title: "Robotic laundry tech", text: "AI-guided wash cycles, self-cleaning machines and around-the-clock automated care.", code: "SYS-01" },
     { title: "Sustainable & efficient", text: "Low water, low energy, eco fabric care.", code: "ECO-02" },
     { title: "Global support", text: "Operations, training and marketing — 360° franchise support.", code: "NET-03" }
   ],

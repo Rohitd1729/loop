@@ -154,16 +154,24 @@
     else el.innerHTML = wordmark(kind === "hero" && !reduced, kind === "hero");
   });
 
-  // Optional artwork playing inside the first O (a looping MP4 on a black background).
-  // Set hero.o1Video in content.js; leave it empty for a plain ring.
+  // The finale keeps the original artwork. The main hero gets its own interactive globe.
   const o1Video = C.hero && C.hero.o1Video;
-  if (o1Video) $$('[data-logo="hero"]').forEach((el) => {
+  if (o1Video) $$('[data-logo="hero"]').filter((el) => !el.closest(".hero__logo")).forEach((el) => {
     const box = document.createElement("div");
     box.className = "o1-media";
     box.setAttribute("aria-hidden", "true");
     box.innerHTML = `<video muted loop playsinline preload="auto"${reduced ? "" : " autoplay"} src="${esc(o1Video)}"></video>`;
     el.appendChild(box);
   });
+  const heroWordmark = $(".hero__logo [data-logo='hero']");
+  if (heroWordmark) {
+    const globe = document.createElement("div");
+    globe.className = "hero-globe";
+    globe.setAttribute("role", "img");
+    globe.setAttribute("aria-label", "Interactive rotating Earth");
+    globe.innerHTML = '<canvas class="hero-globe__canvas" aria-hidden="true"></canvas><span class="hero-globe__fallback" aria-hidden="true">◎</span>';
+    heroWordmark.appendChild(globe);
+  }
 
   /* ------------------------------------------------------------------------
      2. CONTENT — fill the page from content.js
@@ -182,14 +190,14 @@
 
   // Pillars with line icons
   const icons = [
-    `<svg viewBox="-50 -50 100 100"><circle r="46" fill="none" stroke="currentColor" stroke-width="1.5"/><circle r="34" fill="none" stroke="currentColor" stroke-width="1" stroke-dasharray="4 4"/><path d="${arc(0, 0, 40, 30, 120)}" fill="none" stroke="currentColor" stroke-width="4"/><circle r="20" fill="none" stroke="currentColor" stroke-width="1"/><circle r="3" fill="currentColor"/></svg>`,
-    `<svg viewBox="-50 -50 100 100"><path d="M0-44C14-24 28-10 28 10a28 28 0 0 1-56 0C-28-10-14-24 0-44Z" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M-22 12q11-8 22 0t22 0" fill="none" stroke="currentColor" stroke-width="1"/><path d="M-18 24q9-6 18 0t18 0" fill="none" stroke="currentColor" stroke-width="1"/></svg>`,
+    `<svg class="icon-washer" viewBox="0 0 100 100"><rect x="17" y="10" width="66" height="80" rx="7" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M18 29h64M28 20h3m7 0h3m7 0h3" fill="none" stroke="currentColor" stroke-width="1.2"/><circle cx="50" cy="59" r="23" fill="none" stroke="currentColor" stroke-width="1.5"/><g class="icon-washer__drum"><path d="${arc(50, 59, 17, 18, 138)}" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M34 65q8-7 16 0t16 0" fill="none" stroke="currentColor" stroke-width="1"/></g><circle cx="50" cy="59" r="3" fill="#b89a63"/></svg>`,
+    `<svg class="icon-eco" viewBox="-60 -60 120 120"><g class="icon-eco__orbit"><circle r="48" fill="none" stroke="#b89a63" stroke-width="1.5"/><path d="M-33-24A41 41 0 0 1-18-39M17 39A41 41 0 0 1 33 24" fill="none" stroke="#b89a63" stroke-width="1.2" stroke-dasharray="2 3"/><circle cx="34" cy="-34" r="2.8" fill="#f1d39a"/><circle cx="-34" cy="34" r="2.8" fill="#f1d39a"/></g><path class="icon-eco__leaf" d="M0-38C-9-22-31-9-31 8c0 18 17 31 31 43C14 39 31 26 31 8 31-9 9-22 0-38Z" fill="rgba(236,231,223,.08)" stroke="#ece7df" stroke-width="1.5"/><path d="M0-36V49M0 10C9 0 18-5 25-7M0 26C-9 16-18 10-25 7M0-1C7-9 12-15 14-22" fill="none" stroke="#b89a63" stroke-width="1.1"/><circle r="3.2" fill="#f1d39a"/></svg>`,
     `<svg viewBox="-50 -50 100 100"><circle r="44" fill="none" stroke="currentColor" stroke-width="1.5"/><ellipse rx="18" ry="44" fill="none" stroke="currentColor" stroke-width="1"/><path d="M-44 0H44M-38-22H38M-38 22H38" fill="none" stroke="currentColor" stroke-width="1"/><circle cx="26" cy="-20" r="3.5" fill="currentColor"/></svg>`
   ];
   $(".pillars__grid").innerHTML = (C.pillars || []).map((p, i) => `
     <article class="pillar reveal${i === 0 ? " pillar--lead" : ""}" style="--i:${i}">
       <div class="pillar__code mono"><span>${esc(p.code)}</span><span>0${i + 1}</span></div>
-      <div class="pillar__icon">${icons[i % icons.length]}</div>
+      <div class="pillar__icon" aria-hidden="true">${icons[i % icons.length]}</div>
       <h3>${esc(p.title)}</h3><p>${esc(p.text)}</p>
     </article>`).join("");
 
@@ -480,13 +488,36 @@
   const morphPaths = $$(".cycle__stage .m");
   const stepEls = $$(".cycle__steps li");
   const cycleEl = $(".cycle"), idxEl = $(".cycle__idx"), labelEl = $(".cycle__label"), progEl = $(".cycle__progress span");
-  const tickG = $(".cycle__ticks");
+  const tickG = $(".cycle__ticks"), cycleVideoWindow = $(".cycle__video-window"), cycleVideoTrack = $(".cycle__video-track"), cycleVideos = $$(".cycle__video", cycleVideoTrack);
   tickG.innerHTML = Array.from({ length: 72 }, (_, i) => {
     const a = (i / 72) * TAU, r0 = i % 6 === 0 ? 178 : 184, r1 = 192;
     return `<line x1="${(r0 * Math.cos(a)).toFixed(1)}" y1="${(r0 * Math.sin(a)).toFixed(1)}" x2="${(r1 * Math.cos(a)).toFixed(1)}" y2="${(r1 * Math.sin(a)).toFixed(1)}"/>`;
   }).join("");
   let cycleP = 0, cycleVisible = false, lastStep = -1;
-  new IntersectionObserver(([e]) => (cycleVisible = e.isIntersecting)).observe(cycleEl);
+  function startCycleVideo(step, progress) {
+    const video = cycleVideos[step];
+    if (!video) return;
+    cycleVideos.forEach((item) => { if (item !== video) item.pause(); });
+    video.dataset.scrollProgress = String(progress);
+    if (video.readyState < 1 || !Number.isFinite(video.duration)) return;
+    const target = clamp(progress) * Math.max(0, video.duration - 0.04);
+    if (Math.abs(video.currentTime - target) > 0.35) video.currentTime = target;
+    video.play().catch(() => {});
+  }
+  cycleVideos.forEach((video) => video.addEventListener("loadedmetadata", () => {
+    if (video.classList.contains("is-active")) {
+      const step = cycleVideos.indexOf(video);
+      startCycleVideo(step, Number(video.dataset.scrollProgress || clamp(cycleP * steps.length - step)));
+    }
+  }, { once: true }));
+  new IntersectionObserver(([e]) => {
+    cycleVisible = e.isIntersecting;
+    if (!cycleVisible) cycleVideos.forEach((video) => video.pause());
+    else if (!reduced) {
+      const step = Math.min(steps.length - 1, Math.floor(cycleP * steps.length));
+      startCycleVideo(step, clamp(cycleP * steps.length - step));
+    }
+  }).observe(cycleEl);
 
   function radiusAt(a, t, p) {
     // shape leads the label a little, so each step is fully formed when its title lights up
@@ -497,6 +528,10 @@
     return r;
   }
   function drawCycle(t) {
+    if (cycleVideoWindow) {
+      cycleVideoWindow.style.setProperty("--cycle-x", `${((0.5 - cycleP) * 40).toFixed(2)}px`);
+      cycleVideoWindow.style.setProperty("--cycle-zoom", (1.14 - cycleP * 0.14).toFixed(3));
+    }
     morphPaths.forEach((path, j) => {
       const scale = 1 - j * 0.15, rot = (j % 2 ? -1 : 1) * t * 0.00006 * (j + 1) + j * 0.3 + cycleP * Math.PI * (j % 2 ? -1 : 1);
       let d = "";
@@ -509,21 +544,27 @@
     });
     tickG.setAttribute("transform", `rotate(${(cycleP * 180).toFixed(2)})`);
     const step = Math.min(steps.length - 1, Math.floor(cycleP * steps.length));
-    if (step !== lastStep) {
+    const stepChanged = step !== lastStep;
+    if (stepChanged) {
       lastStep = step;
       stepEls.forEach((li, i) => li.classList.toggle("is-active", i === step));
       idxEl.textContent = String(step + 1).padStart(2, "0");
       labelEl.textContent = steps[step] ? `◦ ${steps[step].title}` : "";
+      cycleVideos.forEach((video, i) => {
+        video.classList.toggle("is-active", i === step);
+        if (i !== step) video.pause();
+      });
+      if (!reduced && cycleVisible) startCycleVideo(step, clamp(cycleP * steps.length - step));
     }
     progEl.style.setProperty("--p", cycleP.toFixed(4));
   }
   $(".cycle__num small").textContent = "/ " + String(steps.length).padStart(2, "0");
 
   /* ------------------------------------------------------------------------
-     7. SCROLL — nav, hero parallax, store reveal, drum speed
+     7. SCROLL — nav, hero parallax and cycle progress
      ------------------------------------------------------------------------ */
   const nav = $(".nav"), announce = $(".announce"), heroLogo = $(".hero__logo"), heroInner = $(".hero__inner");
-  const store = $(".store"), storeSteps = $$(".store__steps li");
+  const storeSection = $("#store"), storeImage = $(".store__img", storeSection);
   let lastY = scrollY, velocity = 0;
 
   function onScroll() {
@@ -546,9 +587,14 @@
     cycleP = clamp(-cr.top / (cr.height - vh));
     if (reduced) drawCycle(0);
 
-    const sr = store.getBoundingClientRect();
-    const sp = clamp(-sr.top / (sr.height - vh));
-    storeSteps.forEach((li, i) => li.classList.toggle("is-on", sp > [0.05, 0.38, 0.66][i]));
+    if (storeSection && storeImage && !reduced) {
+      const sr = storeSection.getBoundingClientRect();
+      const sp = clamp((vh - sr.top) / (vh + sr.height));
+      const drift = (0.5 - sp) * 34;
+      const lift = (0.5 - sp) * 18;
+      storeImage.style.transform = `translate3d(${drift.toFixed(1)}px, ${lift.toFixed(1)}px, 0) scale(${(1.04 + sp * 0.12).toFixed(3)})`;
+    }
+
   }
   addEventListener("scroll", onScroll, { passive: true });
   addEventListener("resize", onScroll);
