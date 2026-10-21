@@ -6,7 +6,7 @@
   if (!host || !canvas || !window.THREE) { if (host) host.classList.add("is-fallback"); return; }
 
   const T = THREE, reduced = matchMedia("(prefers-reduced-motion: reduce)").matches, small = innerWidth < 760;
-  const R = 1, GOLD = 0xb99a66, $ = (s, root = document) => root.querySelector(s);
+  const R = 1, $ = (s, root = document) => root.querySelector(s);
   let renderer, raf = 0, visible = false, disposed = false, last = 0, dragging = false;
   let previousX = 0, startX = 0, startY = 0, velocity = 0, mapPixels = null, mapWidth = 0, mapHeight = 0, countryById = new Map(), dotShader = null;
   const selectHandlers = new Set(), scene = new T.Scene();
@@ -14,11 +14,11 @@
   const earth = new T.Group(); scene.add(earth);
 
   // Layer 1: charcoal ocean shell and a restrained edge light.
-  const ocean = new T.Mesh(new T.SphereGeometry(R, 52, 44), new T.MeshStandardMaterial({ color: 0x111211, metalness: .38, roughness: .46 }));
+  const ocean = new T.Mesh(new T.SphereGeometry(R, 52, 44), new T.MeshStandardMaterial({ color: 0x141414, metalness: .38, roughness: .46 }));
   earth.add(ocean);
-  scene.add(new T.AmbientLight(0xaaa99f, .6));
-  const key = new T.DirectionalLight(0xffffff, 1.6); key.position.set(-3, 2, 4); scene.add(key);
-  const rim = new T.PointLight(GOLD, .7, 7); rim.position.set(2, -1, -2); scene.add(rim);
+  scene.add(new T.AmbientLight(0xb4b8bc, .72));
+  const key = new T.DirectionalLight(0xffffff, 1.7); key.position.set(-3, 2, 4); scene.add(key);
+  const rim = new T.PointLight(0xc2c6ca, .7, 7); rim.position.set(2, -1, -2); scene.add(rim);
 
   try {
     renderer = new T.WebGLRenderer({ canvas, alpha: true, antialias: true, powerPreference: "low-power" });
@@ -69,16 +69,16 @@
       if (!id) continue;
       const r = 1.012;
       positions.push(x * r, y * r, z * r); countryIds.push(id); phases.push((i * 0.61803398875) % 1);
-      // Mostly ivory, with a small number of quieter champagne-gold points.
-      const gold = (i % 13) === 0, shade = gold ? .65 + (i % 4) * .07 : .76 + (i % 5) * .045;
-      colors.push(shade, gold ? shade * .84 : shade * .84, gold ? shade * .58 : shade * .68);
+      // Brighter, neutral black-and-white land dots; roughly every 11th point is pushed to full white.
+      const bright = (i % 11) === 0, shade = bright ? 1 : .82 + (i % 5) * .036;
+      colors.push(shade, shade, shade);
     }
     const geometry = new T.BufferGeometry();
     geometry.setAttribute("position", new T.Float32BufferAttribute(positions, 3));
     geometry.setAttribute("color", new T.Float32BufferAttribute(colors, 3));
     geometry.setAttribute("aCountryId", new T.Float32BufferAttribute(countryIds, 1));
     geometry.setAttribute("aPhase", new T.Float32BufferAttribute(phases, 1));
-    const material = new T.PointsMaterial({ color: 0xffffff, size: .018, sizeAttenuation: true, vertexColors: true, transparent: true, opacity: .98, depthWrite: false });
+    const material = new T.PointsMaterial({ color: 0xffffff, size: .02, sizeAttenuation: true, vertexColors: true, transparent: true, opacity: 1, depthWrite: false });
     material.onBeforeCompile = (shader) => {
       shader.uniforms.uLoopTime = { value: 0 }; dotShader = shader;
       shader.vertexShader = "attribute float aPhase; varying float vLoopPhase;\n" + shader.vertexShader;
@@ -97,7 +97,7 @@
       if (disposed) return;
       const texture = new T.Texture(image); texture.needsUpdate = true;
       texture.wrapS = T.RepeatWrapping; texture.repeat.set(-1, 1); texture.offset.x = 7 / 6;
-      const borderSphere = new T.Mesh(new T.SphereGeometry(1.006, 52, 44), new T.MeshBasicMaterial({ map: texture, transparent: true, opacity: .58, depthWrite: false, side: T.FrontSide }));
+      const borderSphere = new T.Mesh(new T.SphereGeometry(1.006, 52, 44), new T.MeshBasicMaterial({ map: texture, transparent: true, opacity: .66, depthWrite: false, side: T.FrontSide }));
       earth.add(borderSphere); schedule();
     };
     image.src = "assets/globe-country-borders.png";
@@ -114,7 +114,7 @@
   };
   // Keep the city hubs as precise points; omit connecting arcs so no line crosses the Earth.
   const hubGeo = new T.BufferGeometry().setFromPoints(hubs.map((city) => toPoint(city.lon, city.lat, 1.022)));
-  const hubMat = new T.PointsMaterial({ color: 0xe7e3da, size: .028, sizeAttenuation: true, transparent: true, opacity: .95, depthWrite: false });
+  const hubMat = new T.PointsMaterial({ color: 0xffffff, size: .032, sizeAttenuation: true, transparent: true, opacity: 1, depthWrite: false });
   earth.add(new T.Points(hubGeo, hubMat));
 
   const raycaster = new T.Raycaster(), pointer = new T.Vector2(); raycaster.params.Points.threshold = .04;
