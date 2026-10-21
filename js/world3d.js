@@ -2,17 +2,18 @@
    LOOP — 3D layer (Three.js r128)
    Two transparent WebGL canvases: the background one (behind the page) holds
    the 3D fabric and the floating thread-dust; the foreground one (above the
-   page, clicks pass through) holds 3D objects pinned to page elements — the
-   pillar icons and the wordmark orbit ring. Every object follows the bounding box of
-   its HTML anchor each frame, so the HTML layout stays the source of truth.
+   page, clicks pass through) holds the wordmark orbit ring, pinned to the logo.
+   It follows the bounding box of its HTML anchor each frame, so the HTML layout
+   stays the source of truth. (Content icons are plain SVG in the page instead:
+   pinned WebGL objects trail a frame behind native scrolling.)
    If WebGL is unavailable nothing changes: the 2D site keeps working.
    ========================================================================== */
 (() => {
   "use strict";
   if (!window.THREE) return;
   // Touch devices skip this layer: two full-screen WebGL canvases redrawn every frame were the
-  // main cost on phones, for subtle effects (dust, 3D pillar icons, logo orbit). The page's 2D
-  // fallbacks (canvas fabric, SVG pillar icons) take over. Set by main.js.
+  // main cost on phones, for subtle effects (dust, logo orbit). The page's 2D canvas fabric
+  // takes over. Set by main.js.
   if (document.documentElement.classList.contains("is-lite")) return;
   const T = THREE;
   const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -176,103 +177,6 @@
     };
   }
 
-  /* ---------- 4. pillar icons as 3D objects ---------- */
-  function createPillarIcons() {
-    const wire = (c, o) => new T.MeshBasicMaterial({ color: c, wireframe: true, transparent: true, opacity: o });
-    const brassSolid = () => new T.MeshStandardMaterial({ color: BRASS, metalness: 0.6, roughness: 0.3 });
-    const makers = [
-      () => { // robotic laundry tech: a front-loading washer with an active drum
-        const g = new T.Group();
-        const body = new T.LineSegments(new T.EdgesGeometry(new T.BoxGeometry(1.16, 1.38, 0.42)), lineMat(IVORY, 0.68));
-        body.position.y = -0.04;
-        const panel = new T.LineSegments(new T.EdgesGeometry(new T.BoxGeometry(0.92, 0.2, 0.012)), lineMat(IVORY, 0.48));
-        panel.position.set(0, 0.49, 0.22);
-        const dial = new T.Mesh(new T.TorusGeometry(0.065, 0.012, 6, 24), new T.MeshBasicMaterial({ color: BRASS }));
-        dial.position.set(-0.31, 0.49, 0.24);
-        const drum = new T.Group(); drum.position.set(0, -0.08, 0.24);
-        drum.add(new T.Mesh(new T.TorusGeometry(0.4, 0.055, 8, 48), new T.MeshBasicMaterial({ color: IVORY, transparent: true, opacity: 0.68 })));
-        drum.add(new T.Mesh(new T.TorusGeometry(0.31, 0.012, 6, 48), new T.MeshBasicMaterial({ color: BRASS, transparent: true, opacity: 0.9 })));
-        drum.add(new T.Mesh(new T.CircleGeometry(0.3, 40), new T.MeshBasicMaterial({ color: 0x151412, transparent: true, opacity: 0.84 })));
-        const sweep = new T.Mesh(new T.TorusGeometry(0.2, 0.009, 5, 40, Math.PI * 1.2), new T.MeshBasicMaterial({ color: IVORY, transparent: true, opacity: 0.55 }));
-        sweep.position.z = 0.012; drum.add(sweep);
-        g.add(body, panel, dial, drum);
-        g.userData.tick = (t, sp) => {
-          drum.rotation.z += 0.012 * sp;
-          g.rotation.y = Math.sin(t * 0.0006) * 0.08;
-          g.rotation.x = 0.06;
-        };
-        return g;
-      },
-      () => { // supplied sustainability mark with a dimensional leaf and orbit layered over it
-        const g = new T.Group();
-        const leafShape = new T.Shape();
-        leafShape.moveTo(0, 0.78);
-        leafShape.bezierCurveTo(-0.12, 0.54, -0.52, 0.2, -0.5, -0.08);
-        leafShape.bezierCurveTo(-0.47, -0.42, -0.15, -0.68, 0, -0.8);
-        leafShape.bezierCurveTo(0.15, -0.68, 0.47, -0.42, 0.5, -0.08);
-        leafShape.bezierCurveTo(0.52, 0.2, 0.12, 0.54, 0, 0.78);
-        const leafGeometry = new T.ShapeGeometry(leafShape, 28);
-        const leaf = new T.Mesh(leafGeometry, new T.MeshBasicMaterial({ color: IVORY, transparent: true, opacity: 0.11, side: T.DoubleSide, depthWrite: false }));
-        leaf.position.z = 0.055;
-        const outline = new T.LineSegments(new T.EdgesGeometry(leafGeometry), lineMat(IVORY, 0.58)); outline.position.z = 0.07;
-        const stem = new T.Line(new T.BufferGeometry().setFromPoints([new T.Vector3(0, 0.77, 0.09), new T.Vector3(0, -0.78, 0.09)]), lineMat(IVORY, 0.76));
-        const veinPoints = [
-          new T.Vector3(0, 0.34, 0.095), new T.Vector3(0.25, 0.61, 0.095),
-          new T.Vector3(0, 0.16, 0.095), new T.Vector3(0.48, 0.02, 0.095),
-          new T.Vector3(0, -0.12, 0.095), new T.Vector3(0.42, -0.38, 0.095),
-          new T.Vector3(0, 0.03, 0.095), new T.Vector3(-0.4, -0.32, 0.095)
-        ];
-        const veins = new T.LineSegments(new T.BufferGeometry().setFromPoints(veinPoints), lineMat(BRASS, 0.82));
-        const orbit = new T.Group();
-        const ring = new T.Mesh(new T.TorusGeometry(0.98, 0.012, 6, 120), new T.MeshBasicMaterial({ color: BRASS, transparent: true, opacity: 0.72 }));
-        const innerArc = new T.Mesh(new T.TorusGeometry(0.73, 0.006, 4, 96, Math.PI * 1.18), new T.MeshBasicMaterial({ color: BRASS, transparent: true, opacity: 0.72 }));
-        innerArc.rotation.z = 0.45;
-        const satellite = new T.Mesh(new T.SphereGeometry(0.055, 16, 12), brassSolid());
-        const satelliteRing = new T.Mesh(new T.TorusGeometry(0.055, 0.012, 6, 24), new T.MeshBasicMaterial({ color: BRASS }));
-        orbit.add(ring, innerArc, satellite, satelliteRing);
-        orbit.rotation.set(0.12, 0.06, 0);
-        g.add(leaf, outline, stem, veins, orbit);
-        g.userData.tick = (t, sp) => {
-          orbit.rotation.z += 0.0015 * sp;
-          orbit.rotation.y = 0.06 + Math.sin(t * 0.0007) * 0.035;
-          const a = t * 0.00035 * sp;
-          satellite.position.set(Math.cos(a + Math.PI * 1.25) * 0.98, Math.sin(a + Math.PI * 1.25) * 0.98, 0.025);
-          satelliteRing.position.set(Math.cos(a + Math.PI * 0.25) * 0.98, Math.sin(a + Math.PI * 0.25) * 0.98, 0.025);
-          leaf.rotation.y = Math.sin(t * 0.00065) * 0.035;
-        };
-        return g;
-      },
-      () => { // global support: a globe with an orbiting satellite
-        const g = new T.Group(), globe = new T.Mesh(new T.SphereGeometry(0.72, 12, 8), wire(IVORY, 0.24));
-        const orbit = new T.Group(), ring = new T.Mesh(new T.TorusGeometry(0.98, 0.007, 6, 120), new T.MeshBasicMaterial({ color: BRASS }));
-        const sat = new T.Mesh(new T.SphereGeometry(0.07, 12, 10), brassSolid());
-        orbit.add(ring, sat);
-        orbit.rotation.set(1.2, 0.3, 0);
-        g.add(globe, orbit);
-        g.userData.tick = (t, sp) => {
-          globe.rotation.y += 0.004 * sp;
-          const a = t * 0.0012 * sp;
-          sat.position.set(Math.cos(a) * 0.98, Math.sin(a) * 0.98, 0);
-        };
-        return g;
-      }
-    ];
-    const items = $$(".pillar__icon").map((el, i) => {
-      const g = makers[i % makers.length]();
-      fg.add(g);
-      return { el, card: el.closest(".pillar"), g, sp: 1 };
-    });
-    return function update(t) {
-      items.forEach((it) => {
-        const r = pin(it.g, it.el);
-        if (!r) return;
-        it.g.scale.setScalar((Math.min(r.width, r.height) / 2) * wpp * 0.95);
-        it.sp = lerp(it.sp, it.card && it.card.matches(":hover") ? 3.2 : 1, 0.06);
-        it.g.userData.tick(t, reduced ? 0 : it.sp);
-      });
-    };
-  }
-
   /* ---------- 4b. the LOOP wordmark in 3D ----------
      An orbit ring sweeps around the wordmark (back half behind the page, front half in front),
      pinned to the flat SVG letters, which stay the source of truth. Earlier experimental
@@ -322,8 +226,7 @@
   const updates = [
     ...$$(".hero, .finale").map(createFabric),
     ...$$(".hero, .finale").map(createLogoOrbitOnly),
-    createDust(),
-    createPillarIcons()
+    createDust()
   ];
   let prev = performance.now();
   let raf = 0;

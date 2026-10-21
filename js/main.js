@@ -16,7 +16,9 @@
   const mqSmall = matchMedia("(max-width: 760px)");
   // Touch devices (phones, tablets) get a lighter build: no full-screen WebGL layers, no backdrop
   // blurs, fewer globe points. Set here, first, so globe.js / world3d.js and the CSS can read it.
-  const lite = matchMedia("(pointer: coarse)").matches;
+  // Any of: coarse pointer, no hover, or a phone-width screen — some phones / browser modes report
+  // a "fine" pointer, and they then ran the desktop 3D layer.
+  const lite = matchMedia("(pointer: coarse), (hover: none), (max-width: 760px)").matches;
   document.documentElement.classList.toggle("is-lite", lite);
   const get = (path) => path.split(".").reduce((o, k) => (o == null ? o : o[k]), C);
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -201,11 +203,39 @@
   const steps = C.cycle?.steps || [];
   $(".cycle__steps").innerHTML = steps.map((s) => `<li><div><h3>${esc(s.title)}</h3></div><p>${esc(s.text)}</p></li>`).join("");
 
-  // Pillars with line icons
+  // Pillar icons: Apple-style "hierarchical" glyphs — the main shape in the gold→silver of the city
+  // names, supporting detail in translucent ivory — each with one quiet motion (CSS, .pi-*).
+  // Plain inline SVG, so they scroll with their cards (the old 3D icons lagged behind on scroll).
+  // Rotating groups contain a full circle centred on their pivot so `fill-box` centres stay true.
+  const pg = (id) => `<defs><linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e2ad45"/><stop offset=".35" stop-color="#ffd982"/><stop offset=".6" stop-color="#fff2cc"/><stop offset="1" stop-color="#c3c9d1"/></linearGradient></defs>`;
   const icons = [
-    `<svg class="icon-washer" viewBox="0 0 100 100"><rect x="17" y="10" width="66" height="80" rx="7" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M18 29h64M28 20h3m7 0h3m7 0h3" fill="none" stroke="currentColor" stroke-width="1.2"/><circle cx="50" cy="59" r="23" fill="none" stroke="currentColor" stroke-width="1.5"/><g class="icon-washer__drum"><path d="${arc(50, 59, 17, 18, 138)}" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M34 65q8-7 16 0t16 0" fill="none" stroke="currentColor" stroke-width="1"/></g><circle cx="50" cy="59" r="3" fill="#b89a63"/></svg>`,
-    `<svg class="icon-eco" viewBox="-60 -60 120 120"><g class="icon-eco__orbit"><circle r="48" fill="none" stroke="#b89a63" stroke-width="1.5"/><path d="M-33-24A41 41 0 0 1-18-39M17 39A41 41 0 0 1 33 24" fill="none" stroke="#b89a63" stroke-width="1.2" stroke-dasharray="2 3"/><circle cx="34" cy="-34" r="2.8" fill="#f1d39a"/><circle cx="-34" cy="34" r="2.8" fill="#f1d39a"/></g><path class="icon-eco__leaf" d="M0-38C-9-22-31-9-31 8c0 18 17 31 31 43C14 39 31 26 31 8 31-9 9-22 0-38Z" fill="rgba(236,231,223,.08)" stroke="#ece7df" stroke-width="1.5"/><path d="M0-36V49M0 10C9 0 18-5 25-7M0 26C-9 16-18 10-25 7M0-1C7-9 12-15 14-22" fill="none" stroke="#b89a63" stroke-width="1.1"/><circle r="3.2" fill="#f1d39a"/></svg>`,
-    `<svg viewBox="-50 -50 100 100"><circle r="44" fill="none" stroke="currentColor" stroke-width="1.5"/><ellipse rx="18" ry="44" fill="none" stroke="currentColor" stroke-width="1"/><path d="M-44 0H44M-38-22H38M-38 22H38" fill="none" stroke="currentColor" stroke-width="1"/><circle cx="26" cy="-20" r="3.5" fill="currentColor"/></svg>`
+    // robotic laundry tech: a washer whose drum (with clothes) turns, and an "AI" sparkle
+    `<svg class="pi" viewBox="0 0 120 120">${pg("pg-w")}
+      <rect x="20" y="12" width="80" height="98" rx="16" fill="currentColor" fill-opacity=".07" stroke="currentColor" stroke-opacity=".38" stroke-width="1.6"/>
+      <path d="M20 34H100" stroke="currentColor" stroke-opacity=".3" stroke-width="1.4"/>
+      <circle cx="33" cy="23" r="4" fill="url(#pg-w)"/><rect x="62" y="19.5" width="28" height="7" rx="3.5" fill="url(#pg-w)" opacity=".85"/>
+      <circle cx="60" cy="72" r="29" fill="none" stroke="url(#pg-w)" stroke-width="5"/>
+      <g class="pi-spin"><circle cx="60" cy="72" r="21" fill="currentColor" fill-opacity=".07"/>
+        <path d="M45 77c4-8 13-10 19-6 4 2 8 2 12-1-1 9-9 14-17 13-6-1-11-3-14-6z" fill="currentColor" fill-opacity=".55"/>
+        <path d="M51 62c5-4 12-4 15 1-5 1-9 4-11 9-3-3-5-6-4-10z" fill="url(#pg-w)"/><circle cx="70" cy="61" r="2.4" fill="currentColor" fill-opacity=".5"/></g>
+      <path d="M44 61a20 20 0 0 1 12-10" fill="none" stroke="#fff" stroke-opacity=".55" stroke-width="2" stroke-linecap="round"/>
+      <path class="pi-twinkle" d="M97 6l2.2 5.8L105 14l-5.8 2.2L97 22l-2.2-5.8L89 14l5.8-2.2Z" fill="url(#pg-w)"/></svg>`,
+    // sustainable & efficient: a leaf and a water drop inside a slowly turning loop
+    `<svg class="pi" viewBox="0 0 120 120">${pg("pg-e")}
+      <g class="pi-loop" fill="none" stroke="currentColor" stroke-opacity=".38" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="60" cy="60" r="48" stroke="none"/>
+        <path d="M76.4 14.9A48 48 0 0 1 76.4 105.1M84.1 107.2L76.4 105.1L81 98.6"/><path d="M43.6 105.1A48 48 0 0 1 43.6 14.9M35.9 12.8L43.6 14.9L39 21.4"/></g>
+      <g class="pi-sway"><path d="M60 22C46 38 34 50 34 66c0 15 11 25 26 30 15-5 26-15 26-30 0-16-12-28-26-44Z" fill="url(#pg-e)"/>
+        <path d="M60 32V92M60 62c7-6 13-9 19-10M60 76c-7-6-13-9-19-10M60 49c5-4 8-8 10-12" fill="none" stroke="#0b0c0d" stroke-opacity=".5" stroke-width="1.8" stroke-linecap="round"/></g>
+      <path class="pi-bob" d="M91 70c-3 5-6 8-6 11a6 6 0 0 0 12 0c0-3-3-6-6-11Z" fill="currentColor" fill-opacity=".75"/></svg>`,
+    // global support: a globe with an orbiting satellite and a pulsing location pin
+    `<svg class="pi" viewBox="0 0 120 120">${pg("pg-n")}
+      <circle cx="60" cy="60" r="34" fill="currentColor" fill-opacity=".07" stroke="currentColor" stroke-opacity=".4" stroke-width="1.6"/>
+      <g fill="none" stroke="currentColor" stroke-opacity=".28" stroke-width="1.3"><ellipse cx="60" cy="60" rx="14" ry="34"/><path d="M26 60H94M30 43H90M30 77H90"/></g>
+      <g class="pi-orbit"><circle cx="60" cy="60" r="54.5" fill="none"/>
+        <circle cx="60" cy="60" r="50" fill="none" stroke="url(#pg-n)" stroke-width="1.6" stroke-dasharray="3 5" opacity=".7"/><circle cx="110" cy="60" r="4.5" fill="url(#pg-n)"/></g>
+      <circle class="pi-pulse" cx="70" cy="48" r="9" fill="none" stroke="url(#pg-n)" stroke-width="1.5"/>
+      <path d="M70 38c-6 0-10 4.4-10 9.8C60 55 70 64 70 64s10-9 10-16.2C80 42.4 76 38 70 38Z" fill="url(#pg-n)"/><circle cx="70" cy="48" r="3.4" fill="#0b0c0d" fill-opacity=".6"/></svg>`
   ];
   $(".pillars__grid").innerHTML = (C.pillars || []).map((p, i) => `
     <article class="pillar reveal${i === 0 ? " pillar--lead" : ""}" style="--i:${i}">
