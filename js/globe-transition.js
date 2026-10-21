@@ -19,13 +19,44 @@
   globe.classList.add("is-live");
 
   let frame = 0;
+  let mode = "";
   const clamp = (value) => Math.max(0, Math.min(1, value));
+
+  // "fixed": the globe flies between the hero O and the slot, positioned by JS each frame.
+  // "docked": once arrived it lives inside the slot and scrolls with the page on the
+  // compositor thread, so a fast fling can never strand the fixed canvas over a later
+  // section (the old bug where the globe floated over "The Loop").
+  const dock = () => {
+    mode = "docked";
+    destination.appendChild(globe);
+    Object.assign(globe.style, {
+      position: "absolute", inset: "0", left: "0", top: "0",
+      width: "100%", height: "100%", margin: "0", transform: "none",
+      zIndex: "", willChange: "auto"
+    });
+  };
+  const undock = () => {
+    mode = "fixed";
+    document.body.appendChild(globe);
+    Object.assign(globe.style, {
+      position: "fixed", inset: "auto", left: "0", top: "0", margin: "0",
+      zIndex: "55", transformOrigin: "center center", willChange: "transform, width, height"
+    });
+  };
+
   const update = () => {
     frame = 0;
-    const from = source.getBoundingClientRect();
-    const to = destination.getBoundingClientRect();
     const viewport = window.innerHeight || document.documentElement.clientHeight;
     const progress = clamp((viewport - scene.getBoundingClientRect().top) / (viewport * .92));
+    hero.classList.toggle("is-globe-leaving", progress > .035);
+    scene.classList.toggle("is-arrived", progress > .94);
+
+    // Arrived (or scrolled past): dock into the slot and let the page carry it.
+    if (progress >= 0.999) { if (mode !== "docked") dock(); return; }
+    if (mode !== "fixed") undock();
+
+    const from = source.getBoundingClientRect();
+    const to = destination.getBoundingClientRect();
     const centerX = from.left + from.width / 2 + (to.left + to.width / 2 - from.left - from.width / 2) * progress;
     const centerY = from.top + from.height / 2 + (to.top + to.height / 2 - from.top - from.height / 2) * progress;
     const scaleX = from.width ? from.width / to.width + (1 - from.width / to.width) * progress : 1;
@@ -34,15 +65,10 @@
     globe.style.width = `${to.width}px`;
     globe.style.height = `${to.height}px`;
     globe.style.transform = `translate3d(${centerX}px, ${centerY}px, 0) translate(-50%, -50%) scale(${scaleX}, ${scaleY})`;
-    hero.classList.toggle("is-globe-leaving", progress > .035);
-    scene.classList.toggle("is-arrived", progress > .94);
   };
   const schedule = () => { if (!frame) frame = requestAnimationFrame(update); };
 
-  Object.assign(globe.style, {
-    position: "fixed", inset: "auto", left: "0", top: "0", zIndex: "55",
-    margin: "0", transformOrigin: "center center", willChange: "transform, width, height"
-  });
+  undock();        // start in the flying state, pinned over the hero O
   update();
   window.addEventListener("scroll", schedule, { passive: true });
   window.addEventListener("resize", schedule, { passive: true });

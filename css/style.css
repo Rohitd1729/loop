@@ -692,7 +692,7 @@ body:not(.is-loading) .preloader { clip-path: inset(0 0 100% 0); visibility: hid
   .stat span { margin-top: 10px; font-size: 14px; }
   .franchise__panel { padding: 28px; border-radius: 22px; }
   .section-head--row { flex-direction: column; align-items: flex-start; }
-  .updates__rail { grid-auto-columns: 82vw; }
+  .updates__rail { grid-auto-columns: 86vw; }
   .contact__title { font-size: clamp(44px, 12vw, 96px); margin-bottom: 40px; text-wrap: balance; }
 }
 
@@ -993,7 +993,8 @@ input, textarea, select { font-size: 16px; }
   .contact__form input:not([type="radio"]) { font-size: 18px; }
   .chip span { min-height: 44px; display: inline-flex; align-items: center; }
 
-  .updates__rail { grid-auto-columns: minmax(0, 82vw); gap: 14px; padding-bottom: 16px; }
+  /* Fixed track width — minmax(0, …) let the cards collapse to one word per line. */
+  .updates__rail { grid-auto-columns: 86vw; gap: 14px; padding-bottom: 16px; }
   .update { border-radius: 16px; }
   .update__body { padding: 18px 18px 20px; }
 
