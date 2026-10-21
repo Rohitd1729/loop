@@ -1,202 +1,267 @@
-/* LOOP's geographic, country-addressable dot globe. Three.js r128. */
+/* LOOP's geographic, black-and-white dot globe. Three.js r128.
+   A factory so the same build can power several instances (the hero wordmark's
+   first O, and the large globe in the network section). Geographic data is loaded
+   once and shared. Each instance exposes a small API, incl. a city-tour used by
+   js/network.js to spin to each LOOP city in turn. */
 (() => {
   "use strict";
-  let host = document.querySelector(".hero-globe");
-  const canvas = host && host.querySelector("canvas");
-  if (!host || !canvas || !window.THREE) { if (host) host.classList.add("is-fallback"); return; }
+  const hosts = [...document.querySelectorAll(".hero-globe, .network-globe")];
+  if (!window.THREE) { hosts.forEach((h) => h.classList.add("is-fallback")); return; }
 
   const T = THREE, reduced = matchMedia("(prefers-reduced-motion: reduce)").matches, small = innerWidth < 760;
-  const R = 1, $ = (s, root = document) => root.querySelector(s);
-  let renderer, raf = 0, visible = false, disposed = false, last = 0, dragging = false;
-  let previousX = 0, startX = 0, startY = 0, velocity = 0, mapPixels = null, mapWidth = 0, mapHeight = 0, countryById = new Map(), dotShader = null;
-  const selectHandlers = new Set(), scene = new T.Scene();
-  const camera = new T.PerspectiveCamera(32, 1, .1, 20); camera.position.z = 4.05;
-  const earth = new T.Group(); scene.add(earth);
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const wrap = (a) => { a %= Math.PI * 2; if (a > Math.PI) a -= Math.PI * 2; if (a < -Math.PI) a += Math.PI * 2; return a; };
 
-  // Layer 1: charcoal ocean shell and a restrained edge light.
-  const ocean = new T.Mesh(new T.SphereGeometry(R, 52, 44), new T.MeshStandardMaterial({ color: 0x141414, metalness: .38, roughness: .46 }));
-  earth.add(ocean);
-  scene.add(new T.AmbientLight(0xb4b8bc, .72));
-  const key = new T.DirectionalLight(0xffffff, 1.7); key.position.set(-3, 2, 4); scene.add(key);
-  const rim = new T.PointLight(0xc2c6ca, .7, 7); rim.position.set(2, -1, -2); scene.add(rim);
-
-  try {
-    renderer = new T.WebGLRenderer({ canvas, alpha: true, antialias: true, powerPreference: "low-power" });
-    renderer.setPixelRatio(Math.min(devicePixelRatio || 1, small ? 1.25 : 1.5)); renderer.setClearColor(0x000000, 0);
-  } catch (_) { host.classList.add("is-fallback"); return; }
-
-  function resize() {
-    const w = Math.max(1, host.clientWidth), h = Math.max(1, host.clientHeight);
-    renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
-  }
-  const resizeObserver = new ResizeObserver(resize); resizeObserver.observe(host); resize();
-  const intersection = new IntersectionObserver(([entry]) => { visible = entry.isIntersecting; schedule(); }, { threshold: .01 });
-  intersection.observe(host);
-
-  // Stable geographic mapping used for both the point layer and future country picking.
-  const mapImage = new Image();
-  mapImage.onload = () => {
-    if (disposed) return;
-    const mapCanvas = document.createElement("canvas"); mapCanvas.width = mapImage.naturalWidth; mapCanvas.height = mapImage.naturalHeight;
-    const mapContext = mapCanvas.getContext("2d", { willReadFrequently: true });
-    mapContext.drawImage(mapImage, 0, 0); mapWidth = mapCanvas.width; mapHeight = mapCanvas.height;
-    mapPixels = mapContext.getImageData(0, 0, mapWidth, mapHeight).data;
-    mapCanvas.width = mapCanvas.height = 1;
-    fetch("assets/globe-countries.json").then((response) => { if (!response.ok) throw new Error(response.status); return response.json(); })
-      .then((data) => {
-        if (disposed) return;
-        countryById = new Map(data.countries.map((country) => [country.id, country]));
-        createLandDots();
-        createBorders();
-        host.classList.remove("is-fallback"); schedule();
-      }).catch(() => host.classList.add("is-fallback"));
-  };
-  mapImage.onerror = () => host.classList.add("is-fallback");
-  mapImage.src = "assets/globe-country-ids.png";
-
-  // Land dots use a sunflower spiral for stable, nearly even spacing from pole to pole.
-  // Each point carries its Natural Earth country ID in a geometry attribute.
-  function createLandDots() {
-    const count = small ? 24000 : 60000, goldenAngle = Math.PI * (3 - Math.sqrt(5));
-    const positions = [], colors = [], countryIds = [], phases = [];
-    for (let i = 0; i < count; i++) {
-      const y = 1 - 2 * (i + .5) / count, ring = Math.sqrt(1 - y * y), theta = i * goldenAngle;
-      const x = ring * Math.cos(theta), z = ring * Math.sin(theta), lat = Math.asin(y) * 180 / Math.PI;
-      const lon = (Math.atan2(x, z) * 180 / Math.PI - 30 + 540) % 360 - 180;
-      const px = Math.min(mapWidth - 1, Math.floor((lon + 180) / 360 * mapWidth));
-      const py = Math.min(mapHeight - 1, Math.floor((90 - lat) / 180 * mapHeight));
-      const offset = (py * mapWidth + px) * 4, id = mapPixels[offset] | (mapPixels[offset + 1] << 8);
-      if (!id) continue;
-      const r = 1.012;
-      positions.push(x * r, y * r, z * r); countryIds.push(id); phases.push((i * 0.61803398875) % 1);
-      // Brighter, neutral black-and-white land dots; roughly every 11th point is pushed to full white.
-      const bright = (i % 11) === 0, shade = bright ? 1 : .82 + (i % 5) * .036;
-      colors.push(shade, shade, shade);
-    }
-    const geometry = new T.BufferGeometry();
-    geometry.setAttribute("position", new T.Float32BufferAttribute(positions, 3));
-    geometry.setAttribute("color", new T.Float32BufferAttribute(colors, 3));
-    geometry.setAttribute("aCountryId", new T.Float32BufferAttribute(countryIds, 1));
-    geometry.setAttribute("aPhase", new T.Float32BufferAttribute(phases, 1));
-    const material = new T.PointsMaterial({ color: 0xffffff, size: .02, sizeAttenuation: true, vertexColors: true, transparent: true, opacity: 1, depthWrite: false });
-    material.onBeforeCompile = (shader) => {
-      shader.uniforms.uLoopTime = { value: 0 }; dotShader = shader;
-      shader.vertexShader = "attribute float aPhase; varying float vLoopPhase;\n" + shader.vertexShader;
-      shader.vertexShader = shader.vertexShader.replace("#include <begin_vertex>", "#include <begin_vertex>\nvLoopPhase = aPhase;");
-      shader.fragmentShader = "uniform float uLoopTime; varying float vLoopPhase;\n" + shader.fragmentShader;
-      shader.fragmentShader = shader.fragmentShader.replace("#include <color_fragment>", "#include <color_fragment>\nfloat twinkle = 0.91 + 0.09 * sin(uLoopTime * 1.4 + vLoopPhase * 6.28318);\ndiffuseColor.rgb *= twinkle;");
-    };
-    material.userData.dotLayer = true;
-    const dots = new T.Points(geometry, material); dots.frustumCulled = false; earth.add(dots);
-  }
-
-  // Layer 3: subtle country outlines, rasterized from the same 1:10m country dataset.
-  function createBorders() {
-    const image = new Image();
-    image.onload = () => {
-      if (disposed) return;
-      const texture = new T.Texture(image); texture.needsUpdate = true;
-      texture.wrapS = T.RepeatWrapping; texture.repeat.set(-1, 1); texture.offset.x = 7 / 6;
-      const borderSphere = new T.Mesh(new T.SphereGeometry(1.006, 52, 44), new T.MeshBasicMaterial({ map: texture, transparent: true, opacity: .66, depthWrite: false, side: T.FrontSide }));
-      earth.add(borderSphere); schedule();
-    };
-    image.src = "assets/globe-country-borders.png";
-  }
-
-  // LOOP route accents: configurable geographic endpoints, drawn as restrained great-circle arcs.
-  const hubs = [
-    { name: "Mumbai", lon: 72.8777, lat: 19.076 }, { name: "Pune", lon: 73.8567, lat: 18.5204 },
-    { name: "Dubai", lon: 55.2708, lat: 25.2048 }, { name: "Singapore", lon: 103.8198, lat: 1.3521 }
-  ];
+  // LOOP cities, in tour order (content.js → network.cities). lon/lat drive the pins and rotation targets.
+  const listed = ((window.LOOP_CONTENT || {}).network || {}).cities;
+  const CITIES = (Array.isArray(listed) && listed.length ? listed : [
+    { city: "Mumbai", lon: 72.8777, lat: 19.076, tag: "Launch", monument: "gateway" },
+    { city: "Pune", lon: 73.8567, lat: 18.5204, tag: "Launch", monument: "shaniwarwada" },
+    { city: "Dubai", lon: 55.2708, lat: 25.2048, tag: "Next", monument: "burjkhalifa" },
+    { city: "Singapore", lon: 103.8198, lat: 1.3521, tag: "Next", monument: "marinabay" }
+  ]).filter((c) => c && c.city && isFinite(c.lat) && isFinite(c.lon)).map((c) => Object.assign({}, c, { name: c.city, lat: +c.lat, lon: +c.lon }));
   const toPoint = (lon, lat, radius) => {
     const la = lat * Math.PI / 180, lo = (lon + 30) * Math.PI / 180, c = Math.cos(la);
     return new T.Vector3(radius * c * Math.sin(lo), radius * Math.sin(la), radius * c * Math.cos(lo));
   };
-  // Keep the city hubs as precise points; omit connecting arcs so no line crosses the Earth.
-  const hubGeo = new T.BufferGeometry().setFromPoints(hubs.map((city) => toPoint(city.lon, city.lat, 1.022)));
-  const hubMat = new T.PointsMaterial({ color: 0xffffff, size: .032, sizeAttenuation: true, transparent: true, opacity: 1, depthWrite: false });
-  earth.add(new T.Points(hubGeo, hubMat));
 
-  const raycaster = new T.Raycaster(), pointer = new T.Vector2(); raycaster.params.Points.threshold = .04;
-  function countryAt(clientX, clientY) {
-    if (!mapPixels) return null;
-    const rect = host.getBoundingClientRect();
-    pointer.set(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
-    raycaster.setFromCamera(pointer, camera);
-    const hit = raycaster.intersectObject(ocean, false)[0]; if (!hit) return null;
-    const local = earth.worldToLocal(hit.point.clone()), lat = Math.asin(Math.max(-1, Math.min(1, local.y / R))) * 180 / Math.PI;
-    const lon = (Math.atan2(local.x, local.z) * 180 / Math.PI - 30 + 540) % 360 - 180;
-    const px = Math.min(mapWidth - 1, Math.max(0, Math.floor((lon + 180) / 360 * mapWidth)));
-    const py = Math.min(mapHeight - 1, Math.max(0, Math.floor((90 - lat) / 180 * mapHeight)));
-    const offset = (py * mapWidth + px) * 4, id = mapPixels[offset] | (mapPixels[offset + 1] << 8);
-    return countryById.get(id) || null;
-  }
-  const down = (e) => { if (e.button !== undefined && e.button !== 0) return; dragging = true; previousX = startX = e.clientX; startY = e.clientY; velocity = 0; host.setPointerCapture(e.pointerId); };
-  const move = (e) => {
-    if (!dragging) return;
-    const dx = e.clientX - previousX; previousX = e.clientX; earth.rotation.y += dx * .008;
-    velocity = reduced ? 0 : dx * .008 * 60; schedule();
-  };
-  const up = (e) => {
-    if (!dragging) return; dragging = false;
-    if (Math.hypot(e.clientX - startX, e.clientY - startY) < 6) {
-      const country = countryAt(e.clientX, e.clientY);
-      if (country) selectHandlers.forEach((handler) => handler(country));
-      if (country) host.dispatchEvent(new CustomEvent("loopcountryselect", { bubbles: true, detail: country }));
+  /* ---------- shared geographic data (loaded once) ---------- */
+  let mapPixels = null, mapWidth = 0, mapHeight = 0, countryById = new Map();
+  let geoState = "loading"; const geoWaiters = [];
+  const onGeo = (cb) => { geoState === "ready" ? cb() : geoState === "loading" && geoWaiters.push(cb); };
+  (function loadGeo() {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const c = document.createElement("canvas"); c.width = img.naturalWidth; c.height = img.naturalHeight;
+        const ctx = c.getContext("2d", { willReadFrequently: true }); ctx.drawImage(img, 0, 0);
+        mapWidth = c.width; mapHeight = c.height; mapPixels = ctx.getImageData(0, 0, mapWidth, mapHeight).data;
+        c.width = c.height = 1;
+      } catch (_) { geoState = "error"; return; }
+      fetch("assets/globe-countries.json").then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
+        .then((data) => { countryById = new Map(data.countries.map((x) => [x.id, x])); geoState = "ready"; geoWaiters.splice(0).forEach((cb) => cb()); })
+        .catch(() => { geoState = "error"; });
+    };
+    img.onerror = () => { geoState = "error"; };
+    img.src = "assets/globe-country-ids.png";
+  })();
+
+  let bordersImg = null, bordersState = "loading"; const borderWaiters = [];
+  const onBorders = (cb) => { bordersState === "ready" ? cb(bordersImg) : bordersState === "loading" && borderWaiters.push(cb); };
+  (function loadBorders() {
+    const img = new Image();
+    img.onload = () => { bordersImg = img; bordersState = "ready"; borderWaiters.splice(0).forEach((cb) => cb(img)); };
+    img.onerror = () => { bordersState = "error"; };
+    img.src = "assets/globe-country-borders.png";
+  })();
+
+  // Soft ring sprite used to pulse the active city pin.
+  const ringTex = (() => {
+    const c = document.createElement("canvas"); c.width = c.height = 64; const g = c.getContext("2d");
+    g.strokeStyle = "rgba(255,255,255,1)"; g.lineWidth = 5; g.beginPath(); g.arc(32, 32, 24, 0, Math.PI * 2); g.stroke();
+    return new T.CanvasTexture(c);
+  })();
+
+  /* ---------- one globe instance ---------- */
+  function createGlobe(host, opts = {}) {
+    let canvas = host.querySelector("canvas");
+    if (!canvas) { canvas = document.createElement("canvas"); canvas.className = "hero-globe__canvas"; canvas.setAttribute("aria-hidden", "true"); host.appendChild(canvas); }
+    const R = 1, pointCount = opts.pointCount || (small ? 24000 : 60000);
+    let renderer, raf = 0, visible = false, disposed = false, last = 0, dragging = false;
+    let previousX = 0, startX = 0, startY = 0, velocity = 0, dotShader = null;
+    let autoSpin = opts.autoSpin !== false, spinSpeed = opts.spinSpeed || 0.16;
+    let target = null, onArrive = null, activeCity = -1;
+    const selectHandlers = new Set();
+    const scene = new T.Scene();
+    const camera = new T.PerspectiveCamera(32, 1, .1, 20); camera.position.z = 4.05;
+    const earth = new T.Group(); scene.add(earth);
+
+    const ocean = new T.Mesh(new T.SphereGeometry(R, 52, 44), new T.MeshStandardMaterial({ color: 0x141414, metalness: .38, roughness: .46 }));
+    earth.add(ocean);
+    scene.add(new T.AmbientLight(0xb4b8bc, .72));
+    const key = new T.DirectionalLight(0xffffff, 1.7); key.position.set(-3, 2, 4); scene.add(key);
+    const rim = new T.PointLight(0xc2c6ca, .7, 7); rim.position.set(2, -1, -2); scene.add(rim);
+
+    try {
+      renderer = new T.WebGLRenderer({ canvas, alpha: true, antialias: true, powerPreference: "low-power" });
+      renderer.setPixelRatio(Math.min(devicePixelRatio || 1, small ? 1.25 : 1.5)); renderer.setClearColor(0x000000, 0);
+    } catch (_) { host.classList.add("is-fallback"); return null; }
+
+    function resize() {
+      const w = Math.max(1, host.clientWidth), h = Math.max(1, host.clientHeight);
+      renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); schedule();
     }
-    if (Math.abs(velocity) > .001) schedule();
-  };
-  host.addEventListener("pointerdown", down); host.addEventListener("pointermove", move);
-  host.addEventListener("pointerup", up); host.addEventListener("pointercancel", up); host.addEventListener("lostpointercapture", () => { dragging = false; });
-  const onVisibility = () => { if (document.hidden) { cancelAnimationFrame(raf); raf = 0; } else schedule(); };
-  document.addEventListener("visibilitychange", onVisibility);
+    const resizeObserver = new ResizeObserver(resize); resizeObserver.observe(host);
+    const intersection = new IntersectionObserver(([e]) => { visible = e.isIntersecting; schedule(); }, { threshold: .01 });
+    intersection.observe(host);
 
-  function schedule() { if (!raf && visible && !document.hidden && !disposed) raf = requestAnimationFrame(tick); }
-  function tick(now) {
-    raf = 0; if (disposed || !visible || document.hidden) return;
-    const dt = Math.min(.05, last ? (now - last) / 1000 : .016); last = now;
-    if (!dragging) { if (!reduced) earth.rotation.y += dt * .16; earth.rotation.y += velocity * dt; velocity *= Math.exp(-2.4 * dt); }
-    if (dotShader) dotShader.uniforms.uLoopTime.value = now * .001;
-    renderer.render(scene, camera);
-    if (!reduced || dragging || Math.abs(velocity) > .001) schedule();
+    function createLandDots() {
+      const goldenAngle = Math.PI * (3 - Math.sqrt(5));
+      const positions = [], colors = [], countryIds = [], phases = [];
+      for (let i = 0; i < pointCount; i++) {
+        const y = 1 - 2 * (i + .5) / pointCount, ring = Math.sqrt(1 - y * y), theta = i * goldenAngle;
+        const x = ring * Math.cos(theta), z = ring * Math.sin(theta), lat = Math.asin(y) * 180 / Math.PI;
+        const lon = (Math.atan2(x, z) * 180 / Math.PI - 30 + 540) % 360 - 180;
+        const px = Math.min(mapWidth - 1, Math.floor((lon + 180) / 360 * mapWidth));
+        const py = Math.min(mapHeight - 1, Math.floor((90 - lat) / 180 * mapHeight));
+        const off = (py * mapWidth + px) * 4, id = mapPixels[off] | (mapPixels[off + 1] << 8);
+        if (!id) continue;
+        const r = 1.012;
+        positions.push(x * r, y * r, z * r); countryIds.push(id); phases.push((i * 0.61803398875) % 1);
+        // Brighter, neutral black-and-white land dots; roughly every 11th point is pushed to full white.
+        const bright = (i % 11) === 0, shade = bright ? 1 : .82 + (i % 5) * .036;
+        colors.push(shade, shade, shade);
+      }
+      const g = new T.BufferGeometry();
+      g.setAttribute("position", new T.Float32BufferAttribute(positions, 3));
+      g.setAttribute("color", new T.Float32BufferAttribute(colors, 3));
+      g.setAttribute("aCountryId", new T.Float32BufferAttribute(countryIds, 1));
+      g.setAttribute("aPhase", new T.Float32BufferAttribute(phases, 1));
+      const material = new T.PointsMaterial({ color: 0xffffff, size: opts.dotSize || .02, sizeAttenuation: true, vertexColors: true, transparent: true, opacity: 1, depthWrite: false });
+      material.onBeforeCompile = (shader) => {
+        shader.uniforms.uLoopTime = { value: 0 }; dotShader = shader;
+        shader.vertexShader = "attribute float aPhase; varying float vLoopPhase;\n" + shader.vertexShader;
+        shader.vertexShader = shader.vertexShader.replace("#include <begin_vertex>", "#include <begin_vertex>\nvLoopPhase = aPhase;");
+        shader.fragmentShader = "uniform float uLoopTime; varying float vLoopPhase;\n" + shader.fragmentShader;
+        shader.fragmentShader = shader.fragmentShader.replace("#include <color_fragment>", "#include <color_fragment>\nfloat twinkle = 0.91 + 0.09 * sin(uLoopTime * 1.4 + vLoopPhase * 6.28318);\ndiffuseColor.rgb *= twinkle;");
+      };
+      const dots = new T.Points(g, material); dots.frustumCulled = false; earth.add(dots);
+    }
+    function createBorders(img) {
+      const texture = new T.Texture(img); texture.needsUpdate = true;
+      texture.wrapS = T.RepeatWrapping; texture.repeat.set(-1, 1); texture.offset.x = 7 / 6;
+      const sphere = new T.Mesh(new T.SphereGeometry(1.006, 52, 44), new T.MeshBasicMaterial({ map: texture, transparent: true, opacity: .66, depthWrite: false, side: T.FrontSide }));
+      earth.add(sphere); schedule();
+    }
+
+    // city pins + a pulsing ring on the active pin
+    const pinGeo = new T.BufferGeometry().setFromPoints(CITIES.map((c) => toPoint(c.lon, c.lat, 1.022)));
+    const pinMat = new T.PointsMaterial({ color: 0xffffff, size: opts.hubSize || .032, sizeAttenuation: true, transparent: true, opacity: 1, depthWrite: false });
+    earth.add(new T.Points(pinGeo, pinMat));
+    const pulse = new T.Sprite(new T.SpriteMaterial({ map: ringTex, color: 0xffffff, transparent: true, opacity: 0, depthWrite: false, depthTest: false }));
+    pulse.visible = false; earth.add(pulse);
+
+    onGeo(() => { if (disposed) return; createLandDots(); host.classList.remove("is-fallback"); schedule(); });
+    onBorders((img) => { if (!disposed && img) createBorders(img); });
+    if (geoState === "error") host.classList.add("is-fallback");
+    resize();
+
+    /* ---------- picking ---------- */
+    const raycaster = new T.Raycaster(), pointer = new T.Vector2(); raycaster.params.Points.threshold = .04;
+    function countryAt(clientX, clientY) {
+      if (!mapPixels) return null;
+      const rect = host.getBoundingClientRect();
+      pointer.set(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
+      raycaster.setFromCamera(pointer, camera);
+      const hit = raycaster.intersectObject(ocean, false)[0]; if (!hit) return null;
+      const local = earth.worldToLocal(hit.point.clone()), lat = Math.asin(clamp(local.y / R, -1, 1)) * 180 / Math.PI;
+      const lon = (Math.atan2(local.x, local.z) * 180 / Math.PI - 30 + 540) % 360 - 180;
+      const px = Math.min(mapWidth - 1, Math.max(0, Math.floor((lon + 180) / 360 * mapWidth)));
+      const py = Math.min(mapHeight - 1, Math.max(0, Math.floor((90 - lat) / 180 * mapHeight)));
+      const off = (py * mapWidth + px) * 4, id = mapPixels[off] | (mapPixels[off + 1] << 8);
+      return countryById.get(id) || null;
+    }
+
+    /* ---------- drag ---------- */
+    // A drag interrupts a tour rotation; on release the globe resumes heading to that city.
+    let heldTarget = null;
+    const down = (e) => { if (e.button !== undefined && e.button !== 0) return; dragging = true; if (target) heldTarget = target; target = null; previousX = startX = e.clientX; startY = e.clientY; velocity = 0; host.setPointerCapture(e.pointerId); };
+    const move = (e) => { if (!dragging) return; const dx = e.clientX - previousX; previousX = e.clientX; earth.rotation.y += dx * .008; velocity = reduced ? 0 : dx * .008 * 60; schedule(); };
+    const up = (e) => {
+      if (!dragging) return; dragging = false;
+      if (Math.hypot(e.clientX - startX, e.clientY - startY) < 6) {
+        const country = countryAt(e.clientX, e.clientY);
+        if (country) { selectHandlers.forEach((h) => h(country)); host.dispatchEvent(new CustomEvent("loopcountryselect", { bubbles: true, detail: country })); }
+      }
+      if (heldTarget && onArrive) { target = heldTarget; velocity = 0; }
+      heldTarget = null;
+      schedule();
+    };
+    host.addEventListener("pointerdown", down); host.addEventListener("pointermove", move);
+    host.addEventListener("pointerup", up); host.addEventListener("pointercancel", up); host.addEventListener("lostpointercapture", up);
+    const onVisibility = () => { if (document.hidden) { cancelAnimationFrame(raf); raf = 0; } else schedule(); };
+    document.addEventListener("visibilitychange", onVisibility);
+
+    /* ---------- loop ---------- */
+    function schedule() { if (!raf && visible && !document.hidden && !disposed) raf = requestAnimationFrame(tick); }
+    function tick(now) {
+      raf = 0; if (disposed || !visible || document.hidden) return;
+      const dt = Math.min(.05, last ? (now - last) / 1000 : .016); last = now;
+      if (dragging) { /* handled in move */ }
+      else if (target) {
+        const k = 1 - Math.exp(-5 * dt);
+        earth.rotation.y += wrap(target.y - earth.rotation.y) * k;
+        earth.rotation.x += (target.x - earth.rotation.x) * k;
+        if (Math.abs(wrap(target.y - earth.rotation.y)) < .004 && Math.abs(target.x - earth.rotation.x) < .004) {
+          earth.rotation.y = target.y; earth.rotation.x = target.x; target = null;
+          const cb = onArrive; onArrive = null; if (cb) cb();
+        }
+      } else {
+        if (autoSpin && !reduced) earth.rotation.y += dt * spinSpeed;
+        earth.rotation.y += velocity * dt; velocity *= Math.exp(-2.4 * dt);
+      }
+      if (dotShader) dotShader.uniforms.uLoopTime.value = now * .001;
+      if (activeCity >= 0) {
+        earth.updateWorldMatrix(true, false);
+        const w = toPoint(CITIES[activeCity].lon, CITIES[activeCity].lat, 1.03).applyMatrix4(earth.matrixWorld);
+        pulse.position.copy(earth.worldToLocal(w.clone()));
+        const beat = (Math.sin(now * .005) + 1) / 2;
+        pulse.scale.setScalar(.07 + beat * .07);
+        pulse.material.opacity = w.z > 0 ? .25 + beat * .55 : 0;
+        pulse.visible = true;
+      } else pulse.visible = false;
+      renderer.render(scene, camera);
+      const busy = !reduced ? (autoSpin || target || activeCity >= 0) : (dragging || target);
+      if (busy || Math.abs(velocity) > .001) schedule();
+    }
+
+    /* ---------- tour helpers ---------- */
+    function cityTarget(i) {
+      const p = toPoint(CITIES[i].lon, CITIES[i].lat, 1);
+      return { x: Math.asin(clamp(p.y, -1, 1)) * 0.9, y: -Math.atan2(p.x, p.z) };
+    }
+    function cityScreen(i) {
+      earth.updateWorldMatrix(true, false);
+      const w = toPoint(CITIES[i].lon, CITIES[i].lat, 1.03).applyMatrix4(earth.matrixWorld);
+      const front = w.z > 0;
+      const v = w.clone().project(camera);
+      const rect = host.getBoundingClientRect();
+      return { x: rect.left + (v.x * .5 + .5) * rect.width, y: rect.top + (-v.y * .5 + .5) * rect.height, front };
+    }
+
+    const onWebGLLost = (e) => { e.preventDefault(); cancelAnimationFrame(raf); raf = 0; host.classList.add("is-fallback"); };
+    const onWebGLRestored = () => { host.classList.remove("is-fallback"); schedule(); };
+    host.addEventListener("webglcontextlost", onWebGLLost); host.addEventListener("webglcontextrestored", onWebGLRestored);
+    const mo = new MutationObserver(() => {
+      if (host.isConnected) return;
+      disposed = true; cancelAnimationFrame(raf); resizeObserver.disconnect(); intersection.disconnect(); mo.disconnect();
+      document.removeEventListener("visibilitychange", onVisibility);
+      scene.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => { if (m.map) m.map.dispose(); m.dispose(); }); });
+      renderer.dispose();
+    });
+    mo.observe(document.body, { childList: true, subtree: true });
+
+    return {
+      cities: CITIES,
+      onCountrySelect(h) { selectHandlers.add(h); return () => selectHandlers.delete(h); },
+      pause() { visible = false; cancelAnimationFrame(raf); raf = 0; },
+      resume() { visible = true; schedule(); },
+      setAutoSpin(on) { autoSpin = on; schedule(); },
+      // Spin the globe so city i faces the camera; resolves when it settles.
+      rotateToCity(i, { spinWhileMoving = false } = {}) {
+        return new Promise((resolve) => { autoSpin = spinWhileMoving; target = cityTarget(i); onArrive = resolve; schedule(); });
+      },
+      setActiveCity(i) { activeCity = (i == null ? -1 : i); schedule(); },
+      getCityScreen: cityScreen,
+      getCountryAt: countryAt,
+      getOrientation() { return { x: earth.rotation.x, y: earth.rotation.y, z: earth.rotation.z }; },
+      setOrientation({ x = earth.rotation.x, y = earth.rotation.y, z = earth.rotation.z } = {}) { earth.rotation.set(x, y, z); schedule(); }
+    };
   }
 
-  // The host itself can later be reparented into a larger viewport without rebuilding the globe.
-  function moveTo(target, duration = 850) {
-    if (!target || !(target instanceof Element)) return Promise.reject(new TypeError("moveTo expects a container element"));
-    const from = host.getBoundingClientRect(); target.appendChild(host);
-    const to = target.getBoundingClientRect();
-    Object.assign(host.style, { position: "fixed", left: `${from.left}px`, top: `${from.top}px`, width: `${from.width}px`, height: `${from.height}px`, margin: "0", zIndex: "20", transition: "none" });
-    void host.offsetWidth;
-    Object.assign(host.style, { transition: `left ${duration}ms cubic-bezier(.2,.7,.1,1), top ${duration}ms cubic-bezier(.2,.7,.1,1), width ${duration}ms cubic-bezier(.2,.7,.1,1), height ${duration}ms cubic-bezier(.2,.7,.1,1)`, left: `${to.left}px`, top: `${to.top}px`, width: `${to.width}px`, height: `${to.height}px` });
-    resize(); schedule();
-    return new Promise((resolve) => setTimeout(() => {
-      Object.assign(host.style, { position: "absolute", inset: "0", left: "0", top: "0", width: "100%", height: "100%", margin: "0", zIndex: "2", transition: "" });
-      resize(); resolve();
-    }, duration));
-  }
-  window.LOOP_GLOBE = {
-    moveTo,
-    onCountrySelect(handler) { selectHandlers.add(handler); return () => selectHandlers.delete(handler); },
-    pause() { visible = false; cancelAnimationFrame(raf); raf = 0; },
-    resume() { visible = true; schedule(); },
-    getCountryAt: countryAt,
-    getOrientation() { return { x: earth.rotation.x, y: earth.rotation.y, z: earth.rotation.z }; },
-    setOrientation({ x = earth.rotation.x, y = earth.rotation.y, z = earth.rotation.z } = {}) { earth.rotation.set(x, y, z); schedule(); },
-    getCountryIndex() { return [...countryById.values()]; }
-  };
-
-  const onWebGLLost = (e) => { e.preventDefault(); cancelAnimationFrame(raf); raf = 0; host.classList.add("is-fallback"); };
-  const onWebGLRestored = () => { host.classList.remove("is-fallback"); schedule(); };
-  host.addEventListener("webglcontextlost", onWebGLLost); host.addEventListener("webglcontextrestored", onWebGLRestored);
-  const observer = new MutationObserver(() => {
-    if (host.isConnected) return;
-    disposed = true; cancelAnimationFrame(raf); resizeObserver.disconnect(); intersection.disconnect(); observer.disconnect();
-    document.removeEventListener("visibilitychange", onVisibility);
-    host.removeEventListener("pointerdown", down); host.removeEventListener("pointermove", move);
-    host.removeEventListener("pointerup", up); host.removeEventListener("pointercancel", up);
-    scene.traverse((object) => { if (object.geometry) object.geometry.dispose(); if (object.material) (Array.isArray(object.material) ? object.material : [object.material]).forEach((material) => { if (material.map) material.map.dispose(); material.dispose(); }); });
-    renderer.dispose(); delete window.LOOP_GLOBE;
-  });
-  observer.observe(document.body, { childList: true, subtree: true });
+  // Hero wordmark O: a compact brand-mark globe. Network section: the large tour globe.
+  const heroHost = document.querySelector(".hero-globe");
+  if (heroHost) window.LOOP_GLOBE = createGlobe(heroHost, { pointCount: small ? 9000 : 16000, dotSize: .024, hubSize: .04, spinSpeed: .14 });
+  const netHost = document.querySelector(".network-globe");
+  if (netHost) window.LOOP_GLOBE_NETWORK = createGlobe(netHost, { pointCount: small ? 24000 : 60000, dotSize: .02, hubSize: .034, spinSpeed: .16 });
 })();

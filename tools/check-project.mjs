@@ -10,7 +10,7 @@ const required = [
   "js/content.js",
   "js/main.js",
   "js/globe.js",
-  "js/globe-transition.js",
+  "js/network.js",
   "js/world3d.js",
   "content/updates.json",
   "assets/globe-countries.json"
@@ -29,7 +29,7 @@ const jsFiles = [
   "js/content.js",
   "js/main.js",
   "js/globe.js",
-  "js/globe-transition.js",
+  "js/network.js",
   "js/world3d.js"
 ];
 

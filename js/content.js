@@ -41,6 +41,32 @@ window.LOOP_CONTENT = {
     { city: "Sydney", monument: "opera", coords: "33.86° S · 151.22° E", tag: "Global" }
   ],
 
+  /* "One world" globe tour — the globe spins to each city in this order and shows
+     its card (city name behind the monument). Add, remove or reorder freely.
+     lat / lon: decimal degrees (south and west are negative).
+     tag:       short status shown on the card.
+     monument:  line-art placeholder — gateway, shaniwarwada, burjkhalifa, marinabay, indiagate,
+                eiffel, bigben, opera, empire, cntower, goldengate, tokyotower, pearl, bankofchina
+     image:     optional cut-out photo of the landmark (transparent PNG), e.g. "assets/cities/dubai.png".
+                When set it replaces the line-art. */
+  network: {
+    cities: [
+      { city: "Mumbai", lat: 19.076, lon: 72.8777, tag: "Launch", monument: "gateway" },
+      { city: "Pune", lat: 18.5204, lon: 73.8567, tag: "Launch", monument: "shaniwarwada" },
+      { city: "Dubai", lat: 25.2048, lon: 55.2708, tag: "Next", monument: "burjkhalifa" },
+      { city: "London", lat: 51.5072, lon: -0.1276, tag: "Expansion", monument: "bigben" },
+      { city: "Paris", lat: 48.8566, lon: 2.3522, tag: "Expansion", monument: "eiffel" },
+      { city: "New York", lat: 40.7128, lon: -74.006, tag: "Expansion", monument: "empire" },
+      { city: "Toronto", lat: 43.6532, lon: -79.3832, tag: "Expansion", monument: "cntower" },
+      { city: "San Francisco", lat: 37.7749, lon: -122.4194, tag: "Expansion", monument: "goldengate" },
+      { city: "Tokyo", lat: 35.6762, lon: 139.6503, tag: "Expansion", monument: "tokyotower" },
+      { city: "Shanghai", lat: 31.2304, lon: 121.4737, tag: "Expansion", monument: "pearl" },
+      { city: "Hong Kong", lat: 22.3193, lon: 114.1694, tag: "Expansion", monument: "bankofchina" },
+      { city: "Singapore", lat: 1.3521, lon: 103.8198, tag: "Next", monument: "marinabay" },
+      { city: "Sydney", lat: -33.8688, lon: 151.2093, tag: "Expansion", monument: "opera" }
+    ]
+  },
+
   /* "The Loop" — the four-step cycle with the morphing shape */
   cycle: {
     eyebrow: "How it works",
