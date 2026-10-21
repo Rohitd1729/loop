@@ -457,8 +457,10 @@ body:not(.is-loading) .preloader { clip-path: inset(0 0 100% 0); visibility: hid
 .pillar__icon svg { width: 100%; height: 100%; overflow: visible; transition: transform 1.2s var(--ease); }
 .pillar:hover .pillar__icon svg { transform: scale(1.04); }
 .icon-washer__drum { transform-box: view-box; transform-origin: 50px 59px; animation: pillar-wash-spin 8s linear infinite; }
-.icon-eco__orbit { transform-box: view-box; transform-origin: center; animation: pillar-eco-orbit 24s linear infinite; }
-.icon-eco__leaf { transform-box: view-box; transform-origin: center; animation: pillar-eco-leaf 5s ease-in-out infinite alternate; }
+/* fill-box: rotate about each shape's own centre. With view-box, browsers resolved "center"
+   from the wrong origin in this 0,0-centred viewBox and the ring drifted off the leaf. */
+.icon-eco__orbit { transform-box: fill-box; transform-origin: center; animation: pillar-eco-orbit 24s linear infinite; }
+.icon-eco__leaf { transform-box: fill-box; transform-origin: center; animation: pillar-eco-leaf 5s ease-in-out infinite alternate; }
 @keyframes pillar-wash-spin { to { transform: rotate(360deg); } }
 @keyframes pillar-eco-orbit { to { transform: rotate(360deg); } }
 @keyframes pillar-eco-leaf { to { transform: rotateY(16deg) scale(1.025); } }

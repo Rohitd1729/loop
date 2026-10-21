@@ -674,19 +674,32 @@
   const storeSection = $("#store"), storeImage = $(".store__img", storeSection), storeStage = $(".store__stage", storeSection);
   let lastY = scrollY, velocity = 0;
 
+  // Section positions in page coordinates, measured only when the layout changes (resize, fonts,
+  // content loading). Each scroll event then just subtracts scrollY: reading layout on every
+  // scroll forced a full style + layout flush, a main source of scroll jank on phones.
+  let geo = null, lastHp = -1;
+  function measureGeo() {
+    const top = (el) => el.getBoundingClientRect().top + scrollY;
+    geo = {
+      annH: announce ? announce.offsetHeight : 0,
+      cycleTop: top(cycleEl), cycleH: cycleEl.offsetHeight,
+      storeTop: storeSection ? top(storeSection) : 0, storeH: storeSection ? storeSection.offsetHeight : 0,
+      lit: litBlocks.map((b) => ({ top: top(b.el), h: b.el.offsetHeight }))
+    };
+  }
+  let geoFrame = 0;
+  const invalidateGeo = () => { geo = null; if (!geoFrame) geoFrame = requestAnimationFrame(() => { geoFrame = 0; onScroll(); }); };
+
   function onScroll() {
-    // read every layout value first, then write: mixing them forced a layout per scroll event
-    const y = scrollY, vh = innerHeight;
-    const annH = announce ? announce.offsetHeight : 0;
-    const cr = cycleEl.getBoundingClientRect();
-    const sr = storeSection && storeImage && !reduced ? storeSection.getBoundingClientRect() : null;
-    const lit = litBlocks.filter((b) => b.near).map((b) => [b, b.el.getBoundingClientRect()]);
+    if (!geo) measureGeo();
+    const y = scrollY, vh = innerHeight, annH = geo.annH;
     velocity += Math.abs(y - lastY);
 
     // statements light up word by word; fully lit once the block's bottom reaches mid-screen
-    lit.forEach(([b, r]) => {
-      const n = b.words.length;
-      const count = reduced ? n : Math.round(clamp((vh * 0.88 - r.top) / (r.height + vh * 0.38)) * n);
+    litBlocks.forEach((b, k) => {
+      if (!b.near) return;
+      const g = geo.lit[k], n = b.words.length;
+      const count = reduced ? n : Math.round(clamp((vh * 0.88 - (g.top - y)) / (g.h + vh * 0.38)) * n);
       if (count === b.lit) return;
       b.words.forEach((w, i) => w.classList.toggle("is-lit", i < count));
       b.lit = count;
@@ -696,17 +709,20 @@
     nav.classList.toggle("is-hidden", y > vh * 0.8 && y > lastY && !document.body.classList.contains("menu-open"));
     lastY = y;
 
-    if (!reduced) {
-      const hp = clamp(y / vh);
+    const hp = clamp(y / vh);
+    if (!reduced && hp !== lastHp) { // past the hero the values stop changing: skip the writes
+      lastHp = hp;
       heroInner.style.transform = `translate3d(0, ${hp * 120}px, 0) scale(${1 - hp * 0.12})`;
       heroInner.style.opacity = String(1 - hp * 0.9);
       // a blur re-rasterises the whole wordmark every scroll frame: desktop only
       if (!lite) heroLogo.style.filter = hp > 0.01 ? `blur(${(hp * 8).toFixed(1)}px)` : "";
     }
 
-    cycleP = clamp(-cr.top / (cr.height - vh));
+    cycleP = clamp((y - geo.cycleTop) / (geo.cycleH - vh));
     if (reduced) drawCycle(0);
 
+    const sTop = geo.storeTop - y;
+    const sr = storeSection && storeImage && !reduced && sTop < vh + 100 && sTop + geo.storeH > -100 ? { top: sTop, height: geo.storeH } : null;
     if (sr) {
       const sp = clamp((vh - sr.top) / (vh + sr.height));
       const drift = (0.5 - sp) * 34;
@@ -722,7 +738,10 @@
 
   }
   addEventListener("scroll", onScroll, { passive: true });
-  addEventListener("resize", onScroll);
+  addEventListener("resize", invalidateGeo);
+  new ResizeObserver(invalidateGeo).observe(document.body); // content, fonts or images changed the page height
+  if (document.fonts) document.fonts.ready.then(invalidateGeo);
+  addEventListener("load", invalidateGeo);
   onScroll();
 
   /* ------------------------------------------------------------------------
@@ -1017,13 +1036,17 @@
     const stage = host && stages.find((st) => st.root === host);
     return { g, s: +g.dataset.speed, cx: g.dataset.cx, cy: g.dataset.cy, live: stage ? () => stage.onScreen : host ? () => !finished : () => true };
   });
-  let angle = 0, prev = performance.now();
+  let angle = 0, prev = performance.now(), lastSpin = -1e9;
   function frame(now) {
     const dt = Math.min(50, now - prev); prev = now;
     velocity *= 0.9;
     const boost = 1 + Math.min(14, velocity * 0.08);
     angle += dt * 0.012 * boost;
-    spins.forEach(({ g, s, cx, cy, live }) => { if (live()) g.setAttribute("transform", `rotate(${(angle * s).toFixed(2)} ${cx} ${cy})`); });
+    // every ring update repaints its logo (the nav's sits in the fixed header): ~20 fps on phones
+    if (!lite || now - lastSpin > 48) {
+      lastSpin = now;
+      spins.forEach(({ g, s, cx, cy, live }) => { if (live()) g.setAttribute("transform", `rotate(${(angle * s).toFixed(2)} ${cx} ${cy})`); });
+    }
     stages.forEach((st) => {
       if (!st.visible) return;
       st.fabric.draw(now);

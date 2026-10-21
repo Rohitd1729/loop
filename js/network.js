@@ -90,22 +90,30 @@
     fitName(name);
   }
 
-  // Tile boxes don't move with the globe, so measure them (relative to the section) only on layout change.
+  // Nothing in the section moves relative to the section while you scroll, so the tile boxes and
+  // the globe's offset are measured only when the layout changes. The per-frame code is then pure
+  // arithmetic — reading layout every frame forced a full style + layout flush (the globe lag).
+  const globeBox = section.querySelector(".network-globe");
+  let hostOff = { x: 0, y: 0 };
   function measure() {
-    const sr = section.getBoundingClientRect();
+    const sr = section.getBoundingClientRect(), gr = globeBox.getBoundingClientRect();
+    hostOff = { x: gr.left - sr.left, y: gr.top - sr.top };
     svg.setAttribute("viewBox", `0 0 ${sr.width} ${sr.height}`); svg.setAttribute("width", sr.width); svg.setAttribute("height", sr.height);
     slots.forEach((s) => {
       const b = s.box.getBoundingClientRect(); s.rect = { l: b.left - sr.left, t: b.top - sr.top, r: b.right - sr.left, b: b.bottom - sr.top };
       if (s.city >= 0) fitName(s.el.querySelector(".city-card__name")); // tile size changed → re-fit the gradient
     });
   }
-  new ResizeObserver(measure).observe(section);
-  addEventListener("resize", measure);
+  let pendingMeasure = 0; // phones fire resize as the address bar slides; coalesce to one per frame
+  const remeasure = () => { if (!pendingMeasure) pendingMeasure = requestAnimationFrame(() => { pendingMeasure = 0; measure(); }); };
+  new ResizeObserver(remeasure).observe(section);
+  addEventListener("resize", remeasure);
+  if (document.fonts) document.fonts.ready.then(remeasure);
   measure();
 
-  function show(ci, st, globeMidY) {
+  function show(ci, st, upper) {
     // upper pins prefer the top row, lower pins the bottom row; left slot first
-    const order = st.y < globeMidY ? [0, 1, 2, 3] : [2, 3, 0, 1];
+    const order = upper ? [0, 1, 2, 3] : [2, 3, 0, 1];
     const s = order.map((n) => slots[n]).find((x) => x.city === -1);
     if (!s) return;
     s.city = ci; s.track = ci; slotOf.set(ci, s);
@@ -121,9 +129,9 @@
   }
 
   // Elbowed leader line from the (moving) pin into the tile's facing edge.
-  function route(s, st, sr) {
+  function route(s, st) {
     const R = s.rect; if (!R) return;
-    const px = st.x - sr.left, py = st.y - sr.top;
+    const px = hostOff.x + st.x, py = hostOff.y + st.y; // pin, in section coordinates
     let ax, ay, ex, ey;
     if (!stacked.matches) { // tiles beside the globe: enter through the inner side edge
       const left = R.r <= px;
@@ -139,17 +147,17 @@
   }
 
   let activeKey = "";
-  globe.onFrame((states, rect) => {
-    const now = performance.now(), sr = section.getBoundingClientRect(), midY = rect.top + rect.height / 2;
+  globe.onFrame((states, w, h) => {
+    const now = performance.now(), midY = h / 2;
     slots.forEach((s) => { if (s.city === -2 && now >= s.until) { s.city = -1; s.track = -1; s.el.classList.remove("is-in", "is-out"); } });
     states.forEach((st, i) => {
       const shown = slotOf.has(i);
       const inView = st.front && Math.abs(st.a) < (shown ? EXIT : WINDOW);
-      if (inView && !shown && st.a < LATE) show(i, st, midY); // don't start a tile that's about to leave
+      if (inView && !shown && st.a < LATE) show(i, st, st.y < midY); // don't start a tile that's about to leave
       else if (!inView && shown) hide(i, now);
     });
     const key = [...slotOf.keys()].join(",");
     if (key !== activeKey) { activeKey = key; globe.setActiveCities([...slotOf.keys()]); }
-    slots.forEach((s) => { if (s.track >= 0) route(s, states[s.track], sr); });
+    slots.forEach((s) => { if (s.track >= 0) route(s, states[s.track]); });
   });
 })();

@@ -58,6 +58,8 @@
     const pageY = (el) => (el ? el.getBoundingClientRect().top + scrollY : 0);
     const hero = document.querySelector(".hero"), foot = document.querySelector(".footer");
     const clearTop = hero ? pageY(hero) + hero.offsetHeight : 0, clearBottom = foot ? pageY(foot) : H;
+    // sections with their own solid backgrounds hide the layer: doodles there would only animate unseen
+    const covered = [...document.querySelectorAll(".global-network, .store, .franchise")].map((el) => [pageY(el), pageY(el) + el.offsetHeight]);
     const cell = phone ? 170 : 250, sMin = phone ? 40 : 56, sMax = phone ? 70 : 104;
     let html = "", bag = [];
     // shuffle bag: every doodle type is used once (in random order) before any repeats
@@ -71,6 +73,7 @@
       const kind = nextKind(), s = sMin + R() * (sMax - sMin);
       const px = x + R() * (cell - s), py = y + R() * (cell - s);
       if (py < clearTop + 24 || py + s > clearBottom - 24) continue;
+      if (covered.some(([a, b]) => py + s > a && py < b)) continue;
       const vars = `--x:${px.toFixed(0)}px;--y:${py.toFixed(0)}px;--s:${s.toFixed(0)}px;` +
         `--r:${((R() - 0.5) * 50).toFixed(1)}deg;--o:${(0.13 + R() * 0.12).toFixed(3)};` +
         `--d:${(9 + R() * 9).toFixed(1)}s;--dl:${(-R() * 18).toFixed(1)}s;` +
