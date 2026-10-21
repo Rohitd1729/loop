@@ -53,13 +53,19 @@
       if (!c.image || photos.has(c.image)) return;
       photos.set(c.image, null);
       const im = new Image(); im.decoding = "async";
-      im.onload = () => photos.set(c.image, { ok: true, wide: im.naturalWidth / im.naturalHeight > 1 });
+      im.onload = () => {
+        photos.set(c.image, { ok: true, wide: im.naturalWidth / im.naturalHeight > 1 });
+        // a tile already showing this city with its line drawing swaps to the photo now
+        slotOf.forEach((s, ci) => { if (cities[ci].image === c.image) setMonument(s, cities[ci]); });
+      };
       im.onerror = () => photos.set(c.image, { ok: false });
       im.src = c.image;
     });
   }
   const near = new IntersectionObserver(([e]) => { if (e.isIntersecting) { preload(); near.disconnect(); } }, { rootMargin: "900px 0px" });
   near.observe(section);
+  // the photos are small: fetch them once the page is idle, so the first tiles already have them
+  addEventListener("load", () => (window.requestIdleCallback || setTimeout)(preload, { timeout: 2500 }), { once: true });
 
   const lineArt = (city) => {
     const m = MON[city.monument];
@@ -76,16 +82,23 @@
     for (const sp of spans) sp.style.setProperty("--x", `${sp.offsetLeft - x0}px`);
   }
 
-  function render(s, city) {
-    const letters = [...city.city.toUpperCase()];
-    const name = s.el.querySelector(".city-card__name"), mon = s.el.querySelector(".city-card__monument");
-    // a photo that hasn't loaded (or failed) falls back to the line drawing for this pass
+  // a photo that hasn't loaded yet (or failed) shows the line drawing until it arrives
+  function setMonument(s, city) {
     const photo = city.image ? photos.get(city.image) : null, usePhoto = !!(photo && photo.ok);
+    if (s.el.classList.contains("is-photo") && usePhoto && s.photoSrc === city.image) return;
     s.el.classList.toggle("is-photo", usePhoto);
     s.el.classList.toggle("is-wide", usePhoto && photo.wide);
+    s.photoSrc = usePhoto ? city.image : "";
+    const late = usePhoto && s.el.classList.contains("is-in") ? ` class="late"` : ""; // arrived mid-show: fade it in
+    s.el.querySelector(".city-card__monument").innerHTML = usePhoto ? `<img src="${esc(city.image)}" alt="" decoding="async"${late}>` : lineArt(city);
+  }
+
+  function render(s, city) {
+    const letters = [...city.city.toUpperCase()];
+    const name = s.el.querySelector(".city-card__name");
+    setMonument(s, city);
     name.style.setProperty("--n", letters.length);
     name.innerHTML = letters.map((ch, k) => ch === " " ? `<span class="sp" style="--k:${k}"></span>` : `<span style="--k:${k}">${esc(ch)}</span>`).join("");
-    mon.innerHTML = usePhoto ? `<img src="${esc(city.image)}" alt="" decoding="async">` : lineArt(city);
     s.el.querySelector(".city-card__meta").innerHTML = `<b>${esc(city.coords)}</b><span>${esc(city.tag)}</span>`;
     fitName(name);
   }

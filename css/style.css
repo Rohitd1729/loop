@@ -1279,6 +1279,8 @@ input, textarea, select { font-size: 16px; }
 }
 .city-card.is-in .city-card__monument img { opacity: 1; transform: none; }
 .city-card.is-wide .city-card__monument img { left: 3%; width: 94%; height: 68%; }
+.city-card__monument img.late { animation: cityPhotoLate .7s var(--ease) both; }
+@keyframes cityPhotoLate { from { opacity: 0; transform: translateY(6%) scale(1.03); } }
 .city-card.is-wide .city-card__name { align-items: flex-start; padding: 9% 0 0; font-size: min(calc(90cqw / (var(--n, 6) * .7)), 40cqh); }
 
 /* bracket corners */
