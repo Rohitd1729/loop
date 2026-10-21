@@ -45,25 +45,59 @@
   });
   const slotOf = new Map(); // city index → slot
 
+  // Landmark photos are preloaded as the section approaches, so a tile never waits on one.
+  // The image's shape picks the layout: tall towers stand centred, wide buildings sit low.
+  const photos = new Map(); // src → { ok, wide } once loaded
+  function preload() {
+    cities.forEach((c) => {
+      if (!c.image || photos.has(c.image)) return;
+      photos.set(c.image, null);
+      const im = new Image(); im.decoding = "async";
+      im.onload = () => photos.set(c.image, { ok: true, wide: im.naturalWidth / im.naturalHeight > 1 });
+      im.onerror = () => photos.set(c.image, { ok: false });
+      im.src = c.image;
+    });
+  }
+  const near = new IntersectionObserver(([e]) => { if (e.isIntersecting) { preload(); near.disconnect(); } }, { rootMargin: "900px 0px" });
+  near.observe(section);
+
+  const lineArt = (city) => {
+    const m = MON[city.monument];
+    return m ? `<svg viewBox="0 0 ${m.vb[0]} ${m.vb[1]}" preserveAspectRatio="xMidYMax meet">` +
+      m.paths.map((d, k) => `<path d="${d}" pathLength="1" style="--k:${k}"/>`).join("") + `</svg>` : "";
+  };
+
+  // One continuous gradient across the whole word: letters are separate elements (so they can
+  // animate), so each paints the same word-wide gradient shifted by its own x offset.
+  function fitName(name) {
+    const spans = name.children; if (!spans.length) return;
+    const x0 = spans[0].offsetLeft, last = spans[spans.length - 1];
+    name.style.setProperty("--ww", `${last.offsetLeft + last.offsetWidth - x0}px`);
+    for (const sp of spans) sp.style.setProperty("--x", `${sp.offsetLeft - x0}px`);
+  }
+
   function render(s, city) {
     const letters = [...city.city.toUpperCase()];
     const name = s.el.querySelector(".city-card__name"), mon = s.el.querySelector(".city-card__monument");
+    // a photo that hasn't loaded (or failed) falls back to the line drawing for this pass
+    const photo = city.image ? photos.get(city.image) : null, usePhoto = !!(photo && photo.ok);
+    s.el.classList.toggle("is-photo", usePhoto);
+    s.el.classList.toggle("is-wide", usePhoto && photo.wide);
     name.style.setProperty("--n", letters.length);
     name.innerHTML = letters.map((ch, k) => ch === " " ? `<span class="sp" style="--k:${k}"></span>` : `<span style="--k:${k}">${esc(ch)}</span>`).join("");
-    if (city.image) mon.innerHTML = `<img src="${esc(city.image)}" alt="">`;
-    else {
-      const m = MON[city.monument];
-      mon.innerHTML = m ? `<svg viewBox="0 0 ${m.vb[0]} ${m.vb[1]}" preserveAspectRatio="xMidYMax meet">` +
-        m.paths.map((d, k) => `<path d="${d}" pathLength="1" style="--k:${k}"/>`).join("") + `</svg>` : "";
-    }
+    mon.innerHTML = usePhoto ? `<img src="${esc(city.image)}" alt="" decoding="async">` : lineArt(city);
     s.el.querySelector(".city-card__meta").innerHTML = `<b>${esc(city.coords)}</b><span>${esc(city.tag)}</span>`;
+    fitName(name);
   }
 
   // Tile boxes don't move with the globe, so measure them (relative to the section) only on layout change.
   function measure() {
     const sr = section.getBoundingClientRect();
     svg.setAttribute("viewBox", `0 0 ${sr.width} ${sr.height}`); svg.setAttribute("width", sr.width); svg.setAttribute("height", sr.height);
-    slots.forEach((s) => { const b = s.box.getBoundingClientRect(); s.rect = { l: b.left - sr.left, t: b.top - sr.top, r: b.right - sr.left, b: b.bottom - sr.top }; });
+    slots.forEach((s) => {
+      const b = s.box.getBoundingClientRect(); s.rect = { l: b.left - sr.left, t: b.top - sr.top, r: b.right - sr.left, b: b.bottom - sr.top };
+      if (s.city >= 0) fitName(s.el.querySelector(".city-card__name")); // tile size changed → re-fit the gradient
+    });
   }
   new ResizeObserver(measure).observe(section);
   addEventListener("resize", measure);

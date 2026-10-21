@@ -1225,15 +1225,22 @@ input, textarea, select { font-size: 16px; }
   font-size: clamp(18px, 2.6vw, 40px);
   font-size: min(calc(90cqw / (var(--n, 6) * .7)), 46cqh);
 }
+/* One signature gradient (red → pink → violet → blue) runs continuously across each name:
+   every letter paints the word-wide gradient (--ww) shifted by its own offset (--x, set in
+   network.js). Vivid colour behind black-and-white photography; fades a little toward the base. */
+.global-network { --name-grad: linear-gradient(100deg, #ff3d3d 0%, #ff4f9b 32%, #8c5bff 66%, #2e8bff 100%); }
 .city-card__name span {
   display: inline-block; color: transparent;
-  background: linear-gradient(180deg, rgba(236,231,223,.7), rgba(236,231,223,.1) 92%);
+  background-image: var(--name-grad); background-repeat: no-repeat;
+  background-size: var(--ww, 100%) 100%; background-position: calc(var(--x, 0px) * -1) 0;
   -webkit-background-clip: text; background-clip: text;
-  opacity: 0; transform: translateY(70%);
-  transition: transform .7s cubic-bezier(.2,.8,.2,1), opacity .5s var(--ease);
-  transition-delay: calc(.4s + var(--k) * 35ms);
+  -webkit-mask-image: linear-gradient(180deg, #000 40%, rgba(0,0,0,.5)); mask-image: linear-gradient(180deg, #000 40%, rgba(0,0,0,.5));
+  /* arrival: each letter rises and comes into focus */
+  opacity: 0; transform: translateY(70%); filter: blur(5px);
+  transition: transform .75s cubic-bezier(.2,.8,.2,1), opacity .55s var(--ease), filter .6s var(--ease);
+  transition-delay: calc(.4s + var(--k) * 40ms);
 }
-.city-card.is-in .city-card__name span { opacity: 1; transform: none; }
+.city-card.is-in .city-card__name span { opacity: 1; transform: none; filter: blur(0); }
 .city-card__name .sp { width: .3em; }
 
 /* landmark in front: line art draws on (placeholder) or a cut-out photo rises in */
@@ -1245,8 +1252,20 @@ input, textarea, select { font-size: 16px; }
   transition: stroke-dashoffset 1s cubic-bezier(.6,0,.3,1); transition-delay: calc(.55s + var(--k) * 60ms);
 }
 .city-card.is-in .city-card__monument path { stroke-dashoffset: 0; }
-.city-card__monument img { height: 100%; width: auto; max-width: 100%; object-fit: contain; opacity: 0; transform: translateY(8%); transition: opacity .6s var(--ease) .55s, transform .8s var(--ease) .55s; }
+/* photo landmarks: the cut-out lifts into place in front of the name, with a soft shadow that
+   separates it from the coloured letters. Tall towers stand centred through the name; wide
+   buildings sit low and the name moves up, so its top half shows above the roofline. */
+.city-card.is-photo .city-card__monument { top: 0; height: auto; }
+.city-card__monument img {
+  position: absolute; left: 4%; bottom: 0; width: 92%; height: 94%;
+  object-fit: contain; object-position: 50% 100%;
+  filter: drop-shadow(0 6px 12px rgba(0,0,0,.55));
+  opacity: 0; transform: translateY(10%) scale(1.04); transform-origin: 50% 100%;
+  transition: opacity .6s var(--ease) .6s, transform .9s cubic-bezier(.2,.8,.2,1) .6s;
+}
 .city-card.is-in .city-card__monument img { opacity: 1; transform: none; }
+.city-card.is-wide .city-card__monument img { left: 3%; width: 94%; height: 68%; }
+.city-card.is-wide .city-card__name { align-items: flex-start; padding: 9% 0 0; font-size: min(calc(90cqw / (var(--n, 6) * .7)), 40cqh); }
 
 /* bracket corners */
 .cc { position: absolute; width: 12px; height: 12px; border: 0 solid rgba(244,241,236,.85); pointer-events: none; opacity: 0; transition: opacity .3s var(--ease) .3s, transform .5s cubic-bezier(.2,.8,.2,1) .3s; }
