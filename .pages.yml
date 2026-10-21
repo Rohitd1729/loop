@@ -51,6 +51,9 @@ content:
             options:
               extensions: [jpg, jpeg, png, webp]
               rename: true
+          - name: alt
+            label: Photo description (for screen readers & SEO)
+            type: string
           - name: text
             label: Short summary (shown on the card)
             type: text

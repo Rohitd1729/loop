@@ -246,7 +246,7 @@
       const fresh = u.date && (Date.now() - new Date(u.date + "T00:00:00")) / 864e5 <= 14;
       const more = u.body && u.body.trim();
       return `<article class="update reveal${fresh ? " is-new" : ""}${more ? " has-more" : ""}" style="--i:${i}" data-i="${i}">
-        ${u.image ? `<div class="update__media"><img src="${esc(asset(u.image))}" alt="" loading="lazy"></div>` : ""}
+        ${u.image ? `<div class="update__media"><img src="${esc(asset(u.image))}" alt="${esc(u.alt)}" loading="lazy"></div>` : ""}
         <div class="update__body">
           <div class="update__meta mono"><b>${esc(u.tag)}</b><time datetime="${esc(u.date)}">${fmt(u.date)}</time></div>
           <h3>${esc(u.title)}</h3><p>${esc(u.text)}</p>
@@ -263,6 +263,7 @@
     $(".article__title", dialog).textContent = u.title;
     const img = $(".article__img", dialog);
     img.hidden = !u.image;
+    img.alt = u.alt || "";
     if (u.image) img.src = asset(u.image);
     $(".article__body", dialog).innerHTML = String(u.body).trim().split(/\n\s*\n/)
       .map((para) => `<p>${esc(para).replace(/\n/g, "<br>")}</p>`).join("");
@@ -490,6 +491,10 @@
   const cycleEl = $(".cycle"), idxEl = $(".cycle__idx"), cycleNum = $(".cycle__num"), labelEl = $(".cycle__label"), progEl = $(".cycle__progress span");
   const tickG = $(".cycle__ticks"), cycleVideoWindow = $(".cycle__video-window"), cycleVideoTrack = $(".cycle__video-track"), cycleVideos = $$(".cycle__video", cycleVideoTrack);
   const cycleStage = $(".cycle__stage");
+  // The morph SVG (shape outlines + ticks) is hidden by CSS — the video carousel replaced it.
+  // Skip its per-frame geometry recompute while it is not displayed.
+  const cycleMorphSvg = $(".cycle__stage svg");
+  const morphActive = cycleMorphSvg ? getComputedStyle(cycleMorphSvg).display !== "none" : false;
   tickG.innerHTML = Array.from({ length: 72 }, (_, i) => {
     const a = (i / 72) * TAU, r0 = i % 6 === 0 ? 178 : 184, r1 = 192;
     return `<line x1="${(r0 * Math.cos(a)).toFixed(1)}" y1="${(r0 * Math.sin(a)).toFixed(1)}" x2="${(r1 * Math.cos(a)).toFixed(1)}" y2="${(r1 * Math.sin(a)).toFixed(1)}"/>`;
@@ -577,17 +582,19 @@
       }
     }
 
-    morphPaths.forEach((path, j) => {
-      const scale = 1 - j * 0.15, rot = (j % 2 ? -1 : 1) * t * 0.00006 * (j + 1) + j * 0.3 + cycleP * Math.PI * (j % 2 ? -1 : 1);
-      let d = "";
-      for (let i = 0; i <= N; i++) {
-        const a = (i / N) * TAU;
-        const r = radiusAt(a, t + j * 400, cycleP) * scale + Math.sin(a * 3 + t * 0.001 + j) * 1.5;
-        d += (i ? "L" : "M") + (r * Math.cos(a + rot)).toFixed(1) + " " + (r * Math.sin(a + rot)).toFixed(1);
-      }
-      path.setAttribute("d", d + "Z");
-    });
-    tickG.setAttribute("transform", `rotate(${(cycleP * 180).toFixed(2)})`);
+    if (morphActive) {
+      morphPaths.forEach((path, j) => {
+        const scale = 1 - j * 0.15, rot = (j % 2 ? -1 : 1) * t * 0.00006 * (j + 1) + j * 0.3 + cycleP * Math.PI * (j % 2 ? -1 : 1);
+        let d = "";
+        for (let i = 0; i <= N; i++) {
+          const a = (i / N) * TAU;
+          const r = radiusAt(a, t + j * 400, cycleP) * scale + Math.sin(a * 3 + t * 0.001 + j) * 1.5;
+          d += (i ? "L" : "M") + (r * Math.cos(a + rot)).toFixed(1) + " " + (r * Math.sin(a + rot)).toFixed(1);
+        }
+        path.setAttribute("d", d + "Z");
+      });
+      tickG.setAttribute("transform", `rotate(${(cycleP * 180).toFixed(2)})`);
+    }
     const stepChanged = step !== lastStep;
     if (stepChanged) {
       lastStep = step;
