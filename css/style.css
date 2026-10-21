@@ -505,26 +505,39 @@ body:not(.is-loading) .preloader { clip-path: inset(0 0 100% 0); visibility: hid
 .service__arrow { font-size: 22px; transform: rotate(-45deg); transition: transform .5s var(--ease); }
 .service:hover .service__arrow { transform: rotate(0); }
 
-/* ---------- store: full-bleed animated storefront background ---------- */
-.store { position: relative; isolation: isolate; overflow: hidden; background: #090a0b; }
-.store__sticky {
-  position: relative; min-height: min(86svh, 900px); max-width: var(--max); margin: 0 auto;
-  display: grid; grid-template-columns: minmax(0, 1fr); align-items: center; padding: clamp(88px, 12svh, 140px) var(--gutter);
+/* ---------- store: Apple-style showcase ----------
+   Copy centred above; the storefront photo shown bright and uncropped (the glowing sign is the
+   hero, so no text sits on it); features in a row below. On desktop the photo starts as an inset,
+   rounded frame, slightly zoomed in, and opens to full-bleed as the camera eases back
+   (main.js sets the frame's clip-path and the photo's scale from scroll). */
+.store { position: relative; background: var(--ink); padding: var(--section-space) 0 clamp(72px, 9vw, 120px); overflow: hidden; }
+.store__head { text-align: center; max-width: 920px; margin: 0 auto clamp(40px, 5.5vw, 72px); }
+.store__head .eyebrow { justify-content: center; }
+.store__head .h2 { margin: 0 auto 18px; max-width: 16ch; font-size: clamp(40px, 5.2vw, 72px); text-wrap: balance; }
+.store__text { margin: 0 auto; max-width: 52ch; color: var(--text-dim); font-size: clamp(17px, 1.35vw, 21px); line-height: 1.45; }
+.store__media { position: relative; height: clamp(420px, min(82svh, 62vw), 860px); }
+.store__frame { position: absolute; inset: 0; overflow: hidden; background: #111; }
+.store__frame::after { /* soft vignette: blends the top into the page and grounds the floor */
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(180deg, rgba(10,10,10,.28), transparent 20%, transparent 72%, rgba(10,10,10,.5));
 }
-.store__caption { position: relative; z-index: 2; width: min(100%, 620px); padding: clamp(24px, 4vw, 48px); }
-.store__caption::before { content: ""; position: absolute; z-index: 0; inset: -35% -38%; background: radial-gradient(ellipse at 38% 50%, rgba(0,0,0,.76), rgba(0,0,0,.43) 46%, transparent 76%); filter: blur(18px); pointer-events: none; }
-.store__caption > * { position: relative; z-index: 1; text-shadow: 0 2px 16px rgba(0,0,0,.72); }
-.store__caption .eyebrow { color: #d0bd97; }
-.store__caption .h2 { color: #f2eee8; font-size: clamp(34px, 4.4vw, 64px); text-wrap: balance; }
-.store__text { color: rgba(242,238,232,.82); max-width: 42ch; margin: 0 0 30px; }
-.store__steps { list-style: none; padding: 0; margin: 0; border-top: 1px solid rgba(242,238,232,.22); max-width: 440px; }
-.store__steps li { display: flex; gap: 18px; padding: 14px 0; border-bottom: 1px solid rgba(242,238,232,.18); color: rgba(242,238,232,.74); transition: color .5s; }
-.store__steps li span { flex: 0 0 28px; color: var(--brass); }
-.store__steps li.is-on, .store__steps li.is-on span { color: #fffdf8; }
-.store__stage { position: absolute; z-index: 0; inset: 0 auto 0 50%; width: 100vw; transform: translateX(-50%); overflow: hidden; background: #101315; }
-.store__stage::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(6,8,9,.78) 0%, rgba(6,8,9,.52) 48%, rgba(6,8,9,.2) 100%), linear-gradient(0deg, rgba(6,8,9,.42), transparent 45%, rgba(6,8,9,.22)); pointer-events: none; }
-.store__img { width: 100%; height: 100%; position: absolute; inset: 0; object-fit: cover; object-position: center 54%; filter: saturate(.72) contrast(1.08) brightness(.72); transform: scale(1.04); will-change: transform; }
-.store__floor { display: none; }
+.store__photo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 40%; transform-origin: 50% 42%; filter: saturate(.92) contrast(1.04); }
+.store__points { list-style: none; max-width: var(--max); margin: clamp(32px, 4vw, 56px) auto 0; padding: 0 var(--gutter); display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(20px, 3vw, 48px); }
+.store__points li { border-top: 1px solid var(--line-strong); padding-top: 18px; font-size: clamp(17px, 1.3vw, 19px); line-height: 1.4; color: var(--text); }
+.store__points li span { display: block; margin-bottom: 8px; color: var(--brass); font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
+/* touch devices: no scroll-driven reveal — a rounded photo inside the margins that fades in */
+.is-lite .store__media { margin: 0 var(--gutter); }
+.is-lite .store__frame { border-radius: 18px; }
+@media (max-width: 760px) {
+  .store__head { text-align: left; margin-bottom: 28px; }
+  .store__head .eyebrow { justify-content: flex-start; }
+  .store__head .h2 { margin-left: 0; font-size: clamp(34px, 9.5vw, 46px); }
+  .store__text { margin: 0; font-size: 17px; }
+  .store__media { height: auto; aspect-ratio: 4 / 3; }
+  .store__points { grid-template-columns: 1fr; gap: 0; margin-top: 24px; }
+  .store__points li { display: flex; gap: 14px; padding: 14px 0; border-top: 0; border-bottom: 1px solid var(--line); font-size: 17px; }
+  .store__points li span { margin: 0; flex: 0 0 24px; }
+}
 
 /* ---------- franchise (light) ---------- */
 .franchise {
@@ -682,12 +695,6 @@ body:not(.is-loading) .preloader { clip-path: inset(0 0 100% 0); visibility: hid
   .cycle__steps h3 { font-size: 18px; }
   .cycle__steps li.is-active p { max-height: 90px; }
   .stats__grid { gap: 24px; }
-  .store__sticky { min-height: max(100svh, 760px); grid-template-columns: 1fr; grid-template-rows: 1fr; gap: 0; padding-top: clamp(100px, 15svh, 132px); padding-bottom: 64px; align-content: center; }
-  .store__caption { width: 100%; padding: clamp(22px, 6vw, 32px) 0; }
-  .store__stage { order: initial; }
-  .store__stage::after { background: linear-gradient(90deg, rgba(6,8,9,.78), rgba(6,8,9,.44)), linear-gradient(0deg, rgba(6,8,9,.35), transparent 55%, rgba(6,8,9,.22)); }
-  .store__text { margin-bottom: 20px; }
-  .store__steps li { padding: 9px 0; }
   .franchise, .updates, .pillars { padding-top: clamp(80px, 12svh, 100px); }
   .pillars { padding-bottom: 32px; }
   .pillars__grid { margin-top: 28px; }
@@ -706,11 +713,8 @@ body:not(.is-loading) .preloader { clip-path: inset(0 0 100% 0); visibility: hid
 }
 
 @media (max-height: 760px) and (min-width: 761px) {
-  .cycle__sticky, .store__sticky { padding-top: 68px; padding-bottom: 24px; }
+  .cycle__sticky { padding-top: 68px; padding-bottom: 24px; }
   .cycle__stage { width: min(100%, 62svh); }
-  .store__stage { height: auto; }
-  .store__caption .h2 { font-size: clamp(34px, 3.8vw, 56px); margin-bottom: 16px; }
-  .store__text { margin-bottom: 20px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -719,7 +723,6 @@ body:not(.is-loading) .preloader { clip-path: inset(0 0 100% 0); visibility: hid
   .grain { display: none; }
   .city__line { stroke-dashoffset: 0; }
   .city__float, .city svg { animation: none; }
-  .store__img { animation: none; }
 }
 
 /* ---------- 3D layer (js/world3d.js; only when WebGL is available) ---------- */
@@ -855,7 +858,6 @@ body:not(.is-loading) .preloader { clip-path: inset(0 0 100% 0); visibility: hid
   .pillar--lead p { font-size: 19px; }
   .stat span { font-size: 17px; }
   .service p { font-size: 17px; }
-  .store__text { font-size: clamp(18px, 1.2vw, 20px); max-width: 42ch; }
   .franchise__lead { font-size: 22px; }
   .franchise__list li { font-size: 19px; }
   .franchise__note { font-size: 15px; }
@@ -936,7 +938,6 @@ input, textarea, select { font-size: 16px; }
 @media (max-width: 760px) {
   :root { --gutter: clamp(18px, 5vw, 24px); }
 
-  .store__stage { left: 0; width: 100%; transform: none; }
 
   .hero {
     min-height: calc(100svh - 34px);
@@ -992,14 +993,6 @@ input, textarea, select { font-size: 16px; }
   .cycle__steps h3 { font-size: 18px; }
   .cycle__steps p { font-size: 14px; line-height: 1.45; }
 
-  .store__sticky {
-    min-height: max(100svh, 680px);
-    padding-top: calc(84px + env(safe-area-inset-top));
-    padding-bottom: calc(48px + env(safe-area-inset-bottom));
-  }
-  .store__caption { padding: 20px 0; }
-  .store__caption .h2 { font-size: clamp(32px, 10vw, 48px); }
-  .store__steps li { gap: 12px; padding: 10px 0; font-size: 10px; letter-spacing: .1em; }
 
   .franchise__grid, .contact__grid { grid-template-columns: 1fr; gap: 40px; }
   .franchise__panel { position: static; padding: 24px; border-radius: 22px; }
@@ -1396,7 +1389,7 @@ body { letter-spacing: -0.01em; font-optical-sizing: auto; text-rendering: optim
 h1, h2, h3, .h2 { font-weight: 600; }
 .h2 { font-size: clamp(36px, 4.8vw, 64px); line-height: 1.06; letter-spacing: -0.028em; }
 .hero__headline, .global-network__content h2, .contact__title, .cycle__steps h3, .pillar h3,
-.service h3, .update h3, .article__title, .store__caption .h2, .menu a { font-weight: 600; }
+.service h3, .update h3, .article__title, .menu a { font-weight: 600; }
 .hero__headline { line-height: 1.1; letter-spacing: -0.02em; }
 .global-network__content h2 { line-height: 1.04; letter-spacing: -0.032em; }
 .contact__title { line-height: .95; letter-spacing: -0.042em; }
@@ -1424,9 +1417,6 @@ h1, h2, h3, .h2 { font-weight: 600; }
 .cycle__steps li::before { font-family: var(--f-body); font-size: 12px; font-weight: 600; letter-spacing: 0; font-variant-numeric: tabular-nums; }
 .cycle__label { font-size: 14px; font-weight: 600; letter-spacing: -0.01em; }
 .franchise__list li span, .contact__socials a small { font-family: var(--f-body); font-size: 12px; font-weight: 600; letter-spacing: 0; text-transform: none; }
-.store__steps { font-size: clamp(15px, 1.2vw, 17px); font-weight: 400; letter-spacing: -0.01em; }
-.store__steps li { font-size: inherit; letter-spacing: inherit; }
-.store__steps li span { font-weight: 600; }
 .update__more { font-size: 15px; font-weight: 400; color: var(--brass); }
 .city-card__meta { font-size: 11px; letter-spacing: 0; }
 /* the hero holograms and HUD read as technical drawings: they keep their monospace caps */

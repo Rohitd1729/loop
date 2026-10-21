@@ -23,7 +23,7 @@
   <meta name="twitter:title" content="LOOP — The Fabric Future">
   <meta name="twitter:description" content="The robotic laundry revolution. Launching soon.">
   <meta name="twitter:image" content="https://rohitd1729.github.io/loop/assets/launch-post.jpg">
-  <link rel="stylesheet" href="css/style.css?v=20261021-icons-v1">
+  <link rel="stylesheet" href="css/style.css?v=20261021-store-v1">
   <noscript>
     <style>
       .preloader {
@@ -192,25 +192,25 @@
       </div>
     </section>
 
-    <!-- STORE: editorial details paired with a static storefront photograph -->
+    <!-- STORE: Apple-style showcase — copy above, the storefront revealed as a frame that opens to
+         full-bleed while the camera eases back (main.js), features below -->
     <section class="store" id="store">
-      <div class="store__sticky">
-        <div class="store__caption">
-          <p class="eyebrow" data-c="store.eyebrow"></p>
-          <h2 class="h2" data-c="store.title"></h2>
-          <p class="store__text" data-c="store.text" data-lit></p>
-          <ol class="store__steps mono">
-            <li><span>01</span>Walk-in drop-off and doorstep pickup</li>
-            <li><span>02</span>Open-view processing floor</li>
-            <li><span>03</span>Same-day express turnaround</li>
-          </ol>
-        </div>
-        <div class="store__stage">
-          <img class="store__img" data-src="store.image"
+      <div class="store__head wrap">
+        <p class="eyebrow reveal" data-c="store.eyebrow"></p>
+        <h2 class="h2 split" data-c="store.title"></h2>
+        <p class="store__text reveal" data-c="store.text" style="--i:1"></p>
+      </div>
+      <div class="store__media">
+        <div class="store__frame">
+          <img class="store__photo" data-src="store.image" loading="lazy" decoding="async"
             alt="LOOP store concept: a black storefront with the glowing LOOP logo and robotic washing machines inside">
-          <div class="store__floor" aria-hidden="true"></div>
         </div>
       </div>
+      <ol class="store__points">
+        <li class="reveal" style="--i:0"><span>01</span>Walk-in drop-off and doorstep pickup</li>
+        <li class="reveal" style="--i:1"><span>02</span>Open-view processing floor</li>
+        <li class="reveal" style="--i:2"><span>03</span>Same-day express turnaround</li>
+      </ol>
     </section>
 
     <!-- FRANCHISE (light, brochure-style) -->
@@ -322,7 +322,7 @@
   </dialog>
 
   <script src="js/content.js?v=20261021-apple-v1"></script>
-  <script src="js/main.js?v=20261021-icons-v1"></script>
+  <script src="js/main.js?v=20261021-store-v1"></script>
   <script src="js/doodles.js?v=20261021-smooth-v1"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="js/world3d.js?v=20261021-icons-v1"></script>

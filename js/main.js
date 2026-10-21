@@ -701,7 +701,8 @@
      7. SCROLL — nav, hero parallax and cycle progress
      ------------------------------------------------------------------------ */
   const nav = $(".nav"), announce = $(".announce"), heroLogo = $(".hero__logo"), heroInner = $(".hero__inner");
-  const storeSection = $("#store"), storeImage = $(".store__img", storeSection), storeStage = $(".store__stage", storeSection);
+  const storeMedia = $(".store__media"), storeFrame = $(".store__frame"), storePhoto = $(".store__photo");
+  if (storeMedia && lite) storeMedia.classList.add("reveal"); // phones: a one-time fade-and-rise instead
   let lastY = scrollY, velocity = 0;
 
   // Section positions in page coordinates, measured only when the layout changes (resize, fonts,
@@ -713,7 +714,7 @@
     geo = {
       annH: announce ? announce.offsetHeight : 0,
       cycleTop: top(cycleEl), cycleH: cycleEl.offsetHeight,
-      storeTop: storeSection ? top(storeSection) : 0, storeH: storeSection ? storeSection.offsetHeight : 0,
+      mediaTop: storeMedia ? top(storeMedia) : 0, mediaH: storeMedia ? storeMedia.offsetHeight : 0,
       lit: litBlocks.map((b) => ({ top: top(b.el), h: b.el.offsetHeight }))
     };
   }
@@ -751,19 +752,15 @@
     cycleP = clamp((y - geo.cycleTop) / (geo.cycleH - vh));
     if (reduced) drawCycle(0);
 
-    const sTop = geo.storeTop - y;
-    const sr = storeSection && storeImage && !reduced && sTop < vh + 100 && sTop + geo.storeH > -100 ? { top: sTop, height: geo.storeH } : null;
-    if (sr) {
-      const sp = clamp((vh - sr.top) / (vh + sr.height));
-      const drift = (0.5 - sp) * 34;
-      const lift = (0.5 - sp) * 18;
-      storeImage.style.transform = `translate3d(${drift.toFixed(1)}px, ${lift.toFixed(1)}px, 0) scale(${(1.04 + sp * 0.12).toFixed(3)})`;
-      // Apple-style expanding media: the photo starts as an inset, rounded frame and opens to
-      // full-bleed as the section rises into place (desktop; phones keep it full-bleed)
-      if (storeStage && !lite) {
-        const q = clamp((vh - sr.top) / (vh * 0.75)), inset = (1 - q) * Math.min(72, innerWidth * 0.06);
-        storeStage.style.clipPath = `inset(${inset.toFixed(1)}px round ${((1 - q) * 28).toFixed(1)}px)`;
-      }
+    // Store showcase (desktop): the photo opens from an inset, rounded frame — slightly zoomed in —
+    // to full-bleed while the camera eases back, as its top rises from the bottom of the screen to
+    // near the top. Phones skip it (static rounded photo with a one-time fade-in).
+    const mTop = geo.mediaTop - y;
+    if (storeFrame && !lite && !reduced && mTop < vh + 120 && mTop + geo.mediaH > -120) {
+      const q = smooth(0, 1, (vh - mTop) / (vh * 0.85)), open = 1 - q;
+      const ix = open * Math.max(innerWidth * 0.09, 24), iy = open * 28, r = open * 28;
+      storeFrame.style.clipPath = `inset(${iy.toFixed(1)}px ${ix.toFixed(1)}px round ${r.toFixed(1)}px)`;
+      storePhoto.style.transform = `scale(${(1 + 0.14 * open).toFixed(4)})`;
     }
 
   }
