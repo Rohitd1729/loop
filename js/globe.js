@@ -70,10 +70,10 @@
     let renderer, raf = 0, visible = false, disposed = false, last = 0, dragging = false;
     let previousX = 0, startX = 0, startY = 0, velocity = 0, dotShader = null;
     let autoSpin = opts.autoSpin !== false, spinSpeed = opts.spinSpeed || 0.16;
-    let target = null, onArrive = null, activeCity = -1;
+    let target = null, onArrive = null;
     const selectHandlers = new Set();
     const scene = new T.Scene();
-    const camera = new T.PerspectiveCamera(32, 1, .1, 20); camera.position.z = 4.05;
+    const camera = new T.PerspectiveCamera(32, 1, .1, 20); camera.position.z = 4.05; camera.updateMatrixWorld();
     const earth = new T.Group(); scene.add(earth);
 
     const ocean = new T.Mesh(new T.SphereGeometry(R, 52, 44), new T.MeshStandardMaterial({ color: 0x141414, metalness: .38, roughness: .46 }));
@@ -138,8 +138,17 @@
     const pinGeo = new T.BufferGeometry().setFromPoints(CITIES.map((c) => toPoint(c.lon, c.lat, 1.022)));
     const pinMat = new T.PointsMaterial({ color: 0xffffff, size: opts.hubSize || .032, sizeAttenuation: true, transparent: true, opacity: 1, depthWrite: false });
     earth.add(new T.Points(pinGeo, pinMat));
-    const pulse = new T.Sprite(new T.SpriteMaterial({ map: ringTex, color: 0xffffff, transparent: true, opacity: 0, depthWrite: false, depthTest: false }));
-    pulse.visible = false; earth.add(pulse);
+    // one pulsing ring per city (shown while that city has a tile in js/network.js)
+    const pinLocal = CITIES.map((c) => toPoint(c.lon, c.lat, 1.03));
+    const pulses = pinLocal.map((p) => {
+      const s = new T.Sprite(new T.SpriteMaterial({ map: ringTex, color: 0xffffff, transparent: true, opacity: 0, depthWrite: false, depthTest: false }));
+      s.position.copy(p); s.visible = false; earth.add(s); return s;
+    });
+    const active = new Set(), frameCbs = new Set(), wv = new T.Vector3();
+    const states = CITIES.map(() => ({ x: 0, y: 0, a: 0, front: false }));
+    // starting pose: axis tilted toward the viewer, a chosen longitude facing front
+    if (opts.tilt) earth.rotation.x = opts.tilt;
+    if (opts.startLon != null) { const p = toPoint(opts.startLon, 0, 1); earth.rotation.y = -Math.atan2(p.x, p.z); }
 
     onGeo(() => { if (disposed) return; createLandDots(); host.classList.remove("is-fallback"); schedule(); });
     onBorders((img) => { if (!disposed && img) createBorders(img); });
@@ -201,17 +210,27 @@
         earth.rotation.y += velocity * dt; velocity *= Math.exp(-2.4 * dt);
       }
       if (dotShader) dotShader.uniforms.uLoopTime.value = now * .001;
-      if (activeCity >= 0) {
-        earth.updateWorldMatrix(true, false);
-        const w = toPoint(CITIES[activeCity].lon, CITIES[activeCity].lat, 1.03).applyMatrix4(earth.matrixWorld);
-        pulse.position.copy(earth.worldToLocal(w.clone()));
-        const beat = (Math.sin(now * .005) + 1) / 2;
-        pulse.scale.setScalar(.07 + beat * .07);
-        pulse.material.opacity = w.z > 0 ? .25 + beat * .55 : 0;
-        pulse.visible = true;
-      } else pulse.visible = false;
+      // where every city pin is this frame: a = angle from the front meridian (−left … +right),
+      // x/y = viewport position. Reported to onFrame listeners after the render.
+      let rect = null;
+      if (frameCbs.size || active.size) {
+        earth.updateMatrixWorld();
+        if (frameCbs.size) rect = host.getBoundingClientRect();
+        for (let i = 0; i < CITIES.length; i++) {
+          const st = states[i]; wv.copy(pinLocal[i]).applyMatrix4(earth.matrixWorld);
+          st.a = Math.atan2(wv.x, wv.z); st.front = wv.z > 0;
+          if (rect) { wv.project(camera); st.x = rect.left + (wv.x * .5 + .5) * rect.width; st.y = rect.top + (-wv.y * .5 + .5) * rect.height; }
+        }
+      }
+      const beat = (Math.sin(now * .005) + 1) / 2;
+      pulses.forEach((s, i) => {
+        const on = active.has(i) && states[i].front;
+        s.visible = on;
+        if (on) { s.scale.setScalar(.07 + beat * .07); s.material.opacity = .3 + beat * .5; }
+      });
       renderer.render(scene, camera);
-      const busy = !reduced ? (autoSpin || target || activeCity >= 0) : (dragging || target);
+      if (rect) frameCbs.forEach((cb) => cb(states, rect));
+      const busy = !reduced ? (autoSpin || target || active.size > 0) : (dragging || target);
       if (busy || Math.abs(velocity) > .001) schedule();
     }
 
@@ -251,7 +270,9 @@
       rotateToCity(i, { spinWhileMoving = false } = {}) {
         return new Promise((resolve) => { autoSpin = spinWhileMoving; target = cityTarget(i); onArrive = resolve; schedule(); });
       },
-      setActiveCity(i) { activeCity = (i == null ? -1 : i); schedule(); },
+      setActiveCities(list) { active.clear(); (list || []).forEach((i) => active.add(i)); schedule(); },
+      // cb(states, hostRect) after every rendered frame; returns an unsubscribe function
+      onFrame(cb) { frameCbs.add(cb); schedule(); return () => frameCbs.delete(cb); },
       getCityScreen: cityScreen,
       getCountryAt: countryAt,
       getOrientation() { return { x: earth.rotation.x, y: earth.rotation.y, z: earth.rotation.z }; },
@@ -263,5 +284,6 @@
   const heroHost = document.querySelector(".hero-globe");
   if (heroHost) window.LOOP_GLOBE = createGlobe(heroHost, { pointCount: small ? 9000 : 16000, dotSize: .024, hubSize: .04, spinSpeed: .14 });
   const netHost = document.querySelector(".network-globe");
-  if (netHost) window.LOOP_GLOBE_NETWORK = createGlobe(netHost, { pointCount: small ? 24000 : 60000, dotSize: .02, hubSize: .034, spinSpeed: .16 });
+  // spinSpeed .23 rad/s: a city crosses network.js's ±0.38 rad front window in ~3.4 s
+  if (netHost) window.LOOP_GLOBE_NETWORK = createGlobe(netHost, { pointCount: small ? 24000 : 60000, dotSize: .02, hubSize: .034, spinSpeed: .23, tilt: .28, startLon: 84 });
 })();

@@ -23,7 +23,7 @@
   <meta name="twitter:title" content="LOOP — The Fabric Future">
   <meta name="twitter:description" content="The robotic laundry revolution. Launching soon.">
   <meta name="twitter:image" content="https://rohitd1729.github.io/loop/assets/launch-post.jpg">
-  <link rel="stylesheet" href="css/style.css?v=20261021-rail-v2">
+  <link rel="stylesheet" href="css/style.css?v=20261021-tiles-v1">
   <noscript>
     <style>
       .preloader {
@@ -114,7 +114,7 @@
       <div class="hero__scroll mono"><span>Scroll</span><i></i></div>
     </section>
 
-    <!-- GLOBAL NETWORK: the live hero Earth travels into this scene as the page scrolls -->
+    <!-- GLOBAL NETWORK: a continuously spinning globe; cities facing you get live tiles (js/network.js) -->
     <section class="global-network" id="global-network" aria-labelledby="global-network-title">
       <div class="global-network__backdrop" aria-hidden="true"></div>
       <div class="global-network__content">
@@ -125,18 +125,9 @@
       <div class="global-network__globe-slot" aria-hidden="true">
         <div class="network-globe"><canvas class="hero-globe__canvas"></canvas><span class="hero-globe__fallback">◎</span></div>
       </div>
-      <!-- City tour (js/network.js): pin → line draws → framed card with the city name behind its monument -->
-      <svg class="network-connector" aria-hidden="true"><path pathLength="1" /><circle r="3" /></svg>
-      <div class="city-card" aria-hidden="true">
-        <div class="city-card__box">
-          <div class="city-card__frame">
-            <div class="city-card__name"></div>
-            <div class="city-card__monument"></div>
-          </div>
-          <i class="cc cc--tl"></i><i class="cc cc--tr"></i><i class="cc cc--bl"></i><i class="cc cc--br"></i>
-        </div>
-        <p class="city-card__meta mono"></p>
-      </div>
+      <!-- leader lines + four tile slots, filled by js/network.js -->
+      <svg class="network-connector" aria-hidden="true"></svg>
+      <div class="city-tiles" aria-hidden="true"></div>
       <p class="global-network__index mono" aria-hidden="true">01 — A CONNECTED CARE NETWORK</p>
     </section>
 
@@ -334,8 +325,8 @@
   <script src="js/main.js?v=20261021-rail-v2"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="js/world3d.js?v=20261021-citytour-v1"></script>
-  <script src="js/globe.js?v=20261021-citytour-v1"></script>
-  <script src="js/network.js?v=20261021-citytour-v1"></script>
+  <script src="js/globe.js?v=20261021-tiles-v1"></script>
+  <script src="js/network.js?v=20261021-tiles-v1"></script>
 </body>
 
 </html>
