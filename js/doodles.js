@@ -54,6 +54,10 @@
     if (Math.abs(W - lastW) < 2 && Math.abs(H - lastH) < 200) return; // nothing meaningful changed
     lastW = W; lastH = H;
     const R = seeded(1729), phone = W < 760;
+    // keep the hero (and the announcement bar above it) and the closing footer clear
+    const pageY = (el) => (el ? el.getBoundingClientRect().top + scrollY : 0);
+    const hero = document.querySelector(".hero"), foot = document.querySelector(".footer");
+    const clearTop = hero ? pageY(hero) + hero.offsetHeight : 0, clearBottom = foot ? pageY(foot) : H;
     const cell = phone ? 170 : 250, sMin = phone ? 40 : 56, sMax = phone ? 70 : 104;
     let html = "", bag = [];
     // shuffle bag: every doodle type is used once (in random order) before any repeats
@@ -65,11 +69,14 @@
     for (let y = 0; y < H; y += cell) for (let x = 0; x < W; x += cell) {
       if (R() > 0.6) continue;
       const kind = nextKind(), s = sMin + R() * (sMax - sMin);
-      const vars = `--x:${(x + R() * (cell - s)).toFixed(0)}px;--y:${(y + R() * (cell - s)).toFixed(0)}px;--s:${s.toFixed(0)}px;` +
+      const px = x + R() * (cell - s), py = y + R() * (cell - s);
+      if (py < clearTop + 24 || py + s > clearBottom - 24) continue;
+      const vars = `--x:${px.toFixed(0)}px;--y:${py.toFixed(0)}px;--s:${s.toFixed(0)}px;` +
         `--r:${((R() - 0.5) * 50).toFixed(1)}deg;--o:${(0.13 + R() * 0.12).toFixed(3)};` +
         `--d:${(9 + R() * 9).toFixed(1)}s;--dl:${(-R() * 18).toFixed(1)}s;` +
         `--fx:${((R() - 0.5) * 28).toFixed(0)}px;--fy:${((R() - 0.5) * 34).toFixed(0)}px;--fr:${((R() - 0.5) * 16).toFixed(1)}deg`;
-      html += `<div class="doodle" style="${vars}"><svg viewBox="0 0 100 100"><use href="#dd-${kind}"/></svg></div>`;
+      // the float animates the plain <i> wrapper (compositor-friendly), not the <svg> itself
+      html += `<div class="doodle" style="${vars}"><i><svg viewBox="0 0 100 100"><use href="#dd-${kind}"/></svg></i></div>`;
     }
     layer.innerHTML = defs + html;
     if (reduced) return;

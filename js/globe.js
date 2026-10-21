@@ -9,6 +9,8 @@
   if (!window.THREE) { hosts.forEach((h) => h.classList.add("is-fallback")); return; }
 
   const T = THREE, reduced = matchMedia("(prefers-reduced-motion: reduce)").matches, small = innerWidth < 760;
+  // touch devices (set by main.js): no antialiasing, 1x pixels, fewer points, ≤ ~30 renders/s
+  const lite = document.documentElement.classList.contains("is-lite");
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const wrap = (a) => { a %= Math.PI * 2; if (a > Math.PI) a -= Math.PI * 2; if (a < -Math.PI) a += Math.PI * 2; return a; };
 
@@ -83,8 +85,8 @@
     const rim = new T.PointLight(0xc2c6ca, .7, 7); rim.position.set(2, -1, -2); scene.add(rim);
 
     try {
-      renderer = new T.WebGLRenderer({ canvas, alpha: true, antialias: true, powerPreference: "low-power" });
-      renderer.setPixelRatio(Math.min(devicePixelRatio || 1, small ? 1.25 : 1.5)); renderer.setClearColor(0x000000, 0);
+      renderer = new T.WebGLRenderer({ canvas, alpha: true, antialias: !lite, powerPreference: "low-power" });
+      renderer.setPixelRatio(lite ? 1 : Math.min(devicePixelRatio || 1, small ? 1.25 : 1.5)); renderer.setClearColor(0x000000, 0);
     } catch (_) { host.classList.add("is-fallback"); return null; }
 
     function resize() {
@@ -193,8 +195,11 @@
 
     /* ---------- loop ---------- */
     function schedule() { if (!raf && visible && !document.hidden && !disposed) raf = requestAnimationFrame(tick); }
+    let lastRender = -1e9;
     function tick(now) {
       raf = 0; if (disposed || !visible || document.hidden) return;
+      if (lite && !dragging && now - lastRender < 31) { schedule(); return; } // ~30 fps on phones
+      lastRender = now;
       const dt = Math.min(.05, last ? (now - last) / 1000 : .016); last = now;
       if (dragging) { /* handled in move */ }
       else if (target) {
@@ -282,8 +287,8 @@
 
   // Hero wordmark O: a compact brand-mark globe. Network section: the large tour globe.
   const heroHost = document.querySelector(".hero-globe");
-  if (heroHost) window.LOOP_GLOBE = createGlobe(heroHost, { pointCount: small ? 9000 : 16000, dotSize: .024, hubSize: .04, spinSpeed: .14 });
+  if (heroHost) window.LOOP_GLOBE = createGlobe(heroHost, { pointCount: lite ? 6000 : small ? 9000 : 16000, dotSize: .024, hubSize: .04, spinSpeed: .14 });
   const netHost = document.querySelector(".network-globe");
   // spinSpeed .23 rad/s: a city crosses network.js's ±0.38 rad front window in ~3.4 s
-  if (netHost) window.LOOP_GLOBE_NETWORK = createGlobe(netHost, { pointCount: small ? 24000 : 60000, dotSize: .02, hubSize: .034, spinSpeed: .23, tilt: .28, startLon: 84 });
+  if (netHost) window.LOOP_GLOBE_NETWORK = createGlobe(netHost, { pointCount: lite ? 15000 : small ? 24000 : 60000, dotSize: .02, hubSize: .034, spinSpeed: .23, tilt: .28, startLon: 84 });
 })();

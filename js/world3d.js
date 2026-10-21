@@ -10,6 +10,10 @@
 (() => {
   "use strict";
   if (!window.THREE) return;
+  // Touch devices skip this layer: two full-screen WebGL canvases redrawn every frame were the
+  // main cost on phones, for subtle effects (dust, 3D pillar icons, logo orbit). The page's 2D
+  // fallbacks (canvas fabric, SVG pillar icons) take over. Set by main.js.
+  if (document.documentElement.classList.contains("is-lite")) return;
   const T = THREE;
   const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
   const fine = matchMedia("(hover: hover) and (pointer: fine)").matches;

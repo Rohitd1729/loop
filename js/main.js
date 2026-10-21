@@ -14,6 +14,10 @@
   const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
   const fine = matchMedia("(hover: hover) and (pointer: fine)").matches;
   const mqSmall = matchMedia("(max-width: 760px)");
+  // Touch devices (phones, tablets) get a lighter build: no full-screen WebGL layers, no backdrop
+  // blurs, fewer globe points. Set here, first, so globe.js / world3d.js and the CSS can read it.
+  const lite = matchMedia("(pointer: coarse)").matches;
+  document.documentElement.classList.toggle("is-lite", lite);
   const get = (path) => path.split(".").reduce((o, k) => (o == null ? o : o[k]), C);
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
@@ -161,9 +165,17 @@
     const box = document.createElement("div");
     box.className = "o1-media";
     box.setAttribute("aria-hidden", "true");
-    box.innerHTML = `<video muted loop playsinline preload="auto"${reduced ? "" : " autoplay"} src="${esc(o1Video)}"></video>`;
+    box.innerHTML = `<video muted loop playsinline preload="metadata" src="${esc(o1Video)}"></video>`;
     el.appendChild(box);
+    // decode only while it's on screen (it used to autoplay from page load, all the time)
+    const v = box.firstChild;
+    if (!reduced) new IntersectionObserver(([e]) => { if (e.isIntersecting) v.play().catch(() => {}); else v.pause(); }).observe(box);
   });
+
+  // Infinite CSS animations keep restyling every frame even when scrolled away; pause them in
+  // sections that are off-screen (CSS: .is-offscreen).
+  const pauseIO = new IntersectionObserver((es) => es.forEach((e) => e.target.classList.toggle("is-offscreen", !e.isIntersecting)), { rootMargin: "120px 0px" });
+  $$(".announce, .hero, .marquee, .cycle, .pillars, .finale").forEach((el) => pauseIO.observe(el));
   const heroWordmark = $(".hero__logo [data-logo='hero']");
   if (heroWordmark) {
     const globe = document.createElement("div");
@@ -455,15 +467,17 @@
   function createFabric(canvas, area) {
     const ctx = canvas.getContext("2d");
     const mouse = { x: -1e4, y: -1e4, tx: -1e4, ty: -1e4 };
-    let cw = 0, ch = 0;
+    let cw = 0, ch = 0, lastDraw = -1e9;
     function size() {
-      const dpr = Math.min(devicePixelRatio || 1, 2);
+      const dpr = lite ? 1 : Math.min(devicePixelRatio || 1, 2); // faint hairlines: 1x is plenty on phones
       cw = canvas.clientWidth; ch = canvas.clientHeight;
       canvas.width = cw * dpr; canvas.height = ch * dpr;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
     function draw(t) {
       if (document.documentElement.classList.contains("has-3d")) return; // the 3D fabric (world3d.js) takes over
+      if (lite && t - lastDraw < 60) return; // slow waves and no hover on touch: ~15 fps looks the same
+      lastDraw = t;
       ctx.clearRect(0, 0, cw, ch);
       mouse.x = lerp(mouse.x, mouse.tx, 0.08); mouse.y = lerp(mouse.y, mouse.ty, 0.08);
       const gap = cw < 700 ? 16 : 13, step = cw < 700 ? 14 : 10, R = 170;
@@ -649,9 +663,12 @@
   let lastY = scrollY, velocity = 0;
 
   function onScroll() {
+    // read every layout value first, then write: mixing them forced a layout per scroll event
     const y = scrollY, vh = innerHeight;
-    velocity += Math.abs(y - lastY);
     const annH = announce ? announce.offsetHeight : 0;
+    const cr = cycleEl.getBoundingClientRect();
+    const sr = storeSection && storeImage && !reduced ? storeSection.getBoundingClientRect() : null;
+    velocity += Math.abs(y - lastY);
     nav.style.top = Math.max(0, annH - y) + "px";
     nav.classList.toggle("is-pinned", y > annH + 10);
     nav.classList.toggle("is-hidden", y > vh * 0.8 && y > lastY && !document.body.classList.contains("menu-open"));
@@ -661,15 +678,14 @@
       const hp = clamp(y / vh);
       heroInner.style.transform = `translate3d(0, ${hp * 120}px, 0) scale(${1 - hp * 0.12})`;
       heroInner.style.opacity = String(1 - hp * 0.9);
-      heroLogo.style.filter = hp > 0.01 ? `blur(${(hp * 8).toFixed(1)}px)` : "";
+      // a blur re-rasterises the whole wordmark every scroll frame: desktop only
+      if (!lite) heroLogo.style.filter = hp > 0.01 ? `blur(${(hp * 8).toFixed(1)}px)` : "";
     }
 
-    const cr = cycleEl.getBoundingClientRect();
     cycleP = clamp(-cr.top / (cr.height - vh));
     if (reduced) drawCycle(0);
 
-    if (storeSection && storeImage && !reduced) {
-      const sr = storeSection.getBoundingClientRect();
+    if (sr) {
       const sp = clamp((vh - sr.top) / (vh + sr.height));
       const drift = (0.5 - sp) * 34;
       const lift = (0.5 - sp) * 18;
@@ -950,6 +966,8 @@
     };
     renderCities($(".hero__cities", root), root);
     new IntersectionObserver(([e]) => { st.visible = e.isIntersecting; maybeLaunch(st); }, { threshold: 0.3 }).observe(root);
+    st.onScreen = i === 0;
+    new IntersectionObserver(([e]) => { st.onScreen = e.isIntersecting; }).observe(root);
     if (reduced) st.fabric.draw(0);
     return st;
   });
@@ -964,14 +982,20 @@
   /* ------------------------------------------------------------------------
      8. MAIN LOOP — spins every robotic O; faster when you scroll (like a drum)
      ------------------------------------------------------------------------ */
-  const spins = $$(".spin").map((g) => ({ g, s: +g.dataset.speed, cx: g.dataset.cx, cy: g.dataset.cy }));
+  // Each spinning ring belongs to the nav logo, the preloader, the hero or the finale; only the
+  // ones on screen are updated (each update restyles and repaints its logo).
+  const spins = $$(".spin").map((g) => {
+    const host = g.closest(".hero, .finale, .preloader");
+    const stage = host && stages.find((st) => st.root === host);
+    return { g, s: +g.dataset.speed, cx: g.dataset.cx, cy: g.dataset.cy, live: stage ? () => stage.onScreen : host ? () => !finished : () => true };
+  });
   let angle = 0, prev = performance.now();
   function frame(now) {
     const dt = Math.min(50, now - prev); prev = now;
     velocity *= 0.9;
     const boost = 1 + Math.min(14, velocity * 0.08);
     angle += dt * 0.012 * boost;
-    spins.forEach(({ g, s, cx, cy }) => g.setAttribute("transform", `rotate(${(angle * s).toFixed(2)} ${cx} ${cy})`));
+    spins.forEach(({ g, s, cx, cy, live }) => { if (live()) g.setAttribute("transform", `rotate(${(angle * s).toFixed(2)} ${cx} ${cy})`); });
     stages.forEach((st) => {
       if (!st.visible) return;
       st.fabric.draw(now);

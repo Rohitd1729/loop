@@ -1328,8 +1328,29 @@ body { position: relative; }
   position: absolute; left: 0; top: 0; width: var(--s); height: var(--s); opacity: var(--o);
   transform: translate(var(--x), var(--y)) rotate(var(--r));
 }
-.doodle svg { display: block; width: 100%; height: 100%; overflow: visible; }
-/* gentle float + sway, only while near the viewport */
-.doodle.is-on svg { animation: doodle-float var(--d) ease-in-out var(--dl) infinite alternate; }
+.doodle i, .doodle svg { display: block; width: 100%; height: 100%; }
+.doodle svg { overflow: visible; }
+/* gentle float + sway on the plain wrapper (compositor-friendly), only while near the viewport */
+.doodle.is-on i { animation: doodle-float var(--d) ease-in-out var(--dl) infinite alternate; }
 @keyframes doodle-float { from { transform: translate(0, 0) rotate(0deg); } to { transform: translate(var(--fx), var(--fy)) rotate(var(--fr)); } }
-@media (prefers-reduced-motion: reduce) { .doodle.is-on svg { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .doodle.is-on i { animation: none; } }
+
+/* ---------- performance ---------- */
+/* Sections scrolled out of view stop their infinite CSS animations (set by main.js). */
+.is-offscreen, .is-offscreen * { animation-play-state: paused !important; }
+/* Touch devices ("lite", set by main.js): no full-screen grain overlay, and solid surfaces
+   instead of live backdrop blurs, which are recomputed on every scroll frame. */
+.is-lite .grain { display: none; }
+.is-lite .nav.is-pinned { background: rgba(10, 10, 10, .94); backdrop-filter: none; -webkit-backdrop-filter: none; }
+.is-lite .cycle__num { background: rgba(8, 9, 10, .86); backdrop-filter: none; -webkit-backdrop-filter: none; }
+.is-lite .hero__logo { will-change: transform; }
+/* City line-art in the hero/footer: stroke-draw, scan and glitch animations repaint on the main
+   thread every frame (the biggest cost there). On touch devices show them fully drawn and static,
+   keeping only the cheap float. */
+.is-lite .city svg, .is-lite .city__line, .is-lite .city__node, .is-lite .city__scan { animation: none; }
+.is-lite .city__line { stroke-dashoffset: 0; }
+.is-lite .city__node { opacity: .6; }
+.is-lite .city__scan { opacity: 0; }
+/* the globe's leader lines redraw every frame: give them their own layer so the backdrop photo
+   and its gradient masks underneath aren't repainted with them */
+.network-connector { will-change: transform; }
