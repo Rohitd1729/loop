@@ -64,7 +64,7 @@ window.LOOP_CONTENT = {
       { city: "Tokyo", lat: 35.6762, lon: 139.6503, tag: "Expansion", monument: "tokyotower", image: "assets/cities/tokyo.webp" },
       { city: "Shanghai", lat: 31.2304, lon: 121.4737, tag: "Expansion", monument: "pearl", image: "assets/cities/shanghai.webp" },
       { city: "Hong Kong", lat: 22.3193, lon: 114.1694, tag: "Expansion", monument: "bankofchina", image: "assets/cities/hong-kong.webp" },
-      { city: "Singapore", lat: 1.3521, lon: 103.8198, tag: "Next", monument: "marinabay" },
+      { city: "Singapore", lat: 1.3521, lon: 103.8198, tag: "Next", monument: "marinabay", image: "assets/cities/singapore.webp" },
       { city: "Sydney", lat: -33.8688, lon: 151.2093, tag: "Expansion", monument: "opera", image: "assets/cities/sydney.webp" }
     ]
   },
