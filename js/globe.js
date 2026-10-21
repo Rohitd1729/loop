@@ -5,7 +5,7 @@
   const canvas = host && host.querySelector("canvas");
   if (!host || !canvas || !window.THREE) { if (host) host.classList.add("is-fallback"); return; }
 
-  const T = THREE, reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const T = THREE, reduced = matchMedia("(prefers-reduced-motion: reduce)").matches, small = innerWidth < 760;
   const R = 1, GOLD = 0xb99a66, $ = (s, root = document) => root.querySelector(s);
   let renderer, raf = 0, visible = false, disposed = false, last = 0, dragging = false;
   let previousX = 0, startX = 0, startY = 0, velocity = 0, mapPixels = null, mapWidth = 0, mapHeight = 0, countryById = new Map(), dotShader = null;
@@ -22,7 +22,7 @@
 
   try {
     renderer = new T.WebGLRenderer({ canvas, alpha: true, antialias: true, powerPreference: "low-power" });
-    renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 1.5)); renderer.setClearColor(0x000000, 0);
+    renderer.setPixelRatio(Math.min(devicePixelRatio || 1, small ? 1.25 : 1.5)); renderer.setClearColor(0x000000, 0);
   } catch (_) { host.classList.add("is-fallback"); return; }
 
   function resize() {
@@ -57,7 +57,7 @@
   // Land dots use a sunflower spiral for stable, nearly even spacing from pole to pole.
   // Each point carries its Natural Earth country ID in a geometry attribute.
   function createLandDots() {
-    const count = 60000, goldenAngle = Math.PI * (3 - Math.sqrt(5));
+    const count = small ? 24000 : 60000, goldenAngle = Math.PI * (3 - Math.sqrt(5));
     const positions = [], colors = [], countryIds = [], phases = [];
     for (let i = 0; i < count; i++) {
       const y = 1 - 2 * (i + .5) / count, ring = Math.sqrt(1 - y * y), theta = i * goldenAngle;

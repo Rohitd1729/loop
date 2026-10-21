@@ -78,6 +78,8 @@ h2, h3 { font-family: var(--f-display); }
   0% { transform: translate(0, 0); } 20% { transform: translate(-4%, 3%); } 40% { transform: translate(3%, -5%); }
   60% { transform: translate(-2%, 4%); } 80% { transform: translate(5%, 1%); } 100% { transform: translate(0, 0); }
 }
+/* Phones: keep the grain texture but stop repainting it every few frames. */
+@media (max-width: 760px) { .grain { animation: none; } }
 
 
 /* ---------- preloader ---------- */

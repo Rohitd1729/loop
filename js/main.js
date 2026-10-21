@@ -13,6 +13,7 @@
   const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a)); return t * t * (3 - 2 * t); };
   const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
   const fine = matchMedia("(hover: hover) and (pointer: fine)").matches;
+  const mqSmall = matchMedia("(max-width: 760px)");
   const get = (path) => path.split(".").reduce((o, k) => (o == null ? o : o[k]), C);
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
@@ -543,6 +544,7 @@
       const travel = cardWidth * .38;
       const cardRatio = parseFloat(getComputedStyle(cycleVideoWindow).getPropertyValue("--cycle-card-size")) || .72;
       let activeCard = null;
+      const smallCard = mqSmall.matches;
       cycleVideos.forEach((video, i) => {
         let d = i - phase;
         while (d > steps.length / 2) d -= steps.length;
@@ -556,16 +558,27 @@
         // Keep the focused clip fully opaque throughout the handoff. Side clips
         // stay as quiet previews and cannot show through the main tile.
         const opacity = isActive ? 1 : .16 + front * .84;
-        const brightness = isActive ? 1 : .38 + front * .2;
-        const saturation = isActive ? .94 : .38 + front * .2;
-        const vignette = .56 - front * .38;
         const rotateY = -d * 12;
         const rotateZ = -d * 1.5;
-        video.style.transform = `translate3d(calc(-50% + ${x.toFixed(2)}px), calc(-50% + ${y.toFixed(2)}px), 0) scale(${scale.toFixed(4)}) rotateY(${rotateY.toFixed(2)}deg) rotateZ(${rotateZ.toFixed(2)}deg)`;
-        video.style.opacity = opacity.toFixed(3);
-        video.style.filter = `brightness(${brightness.toFixed(3)}) saturate(${saturation.toFixed(3)}) contrast(1.05)`;
-        video.style.boxShadow = `inset 0 0 ${Math.round(cardWidth * .08)}px rgba(0, 0, 0, ${vignette.toFixed(3)}), 0 28px 90px rgba(0, 0, 0, ${(.18 + front * .24).toFixed(3)})`;
-        video.style.zIndex = isActive ? "1000" : String(Math.round(front * 100 - distance));
+        // Only write a property when its value actually changed: idle-but-visible frames
+        // then cost nothing, and we never thrash style/layout for no reason.
+        const cache = video.__cyc || (video.__cyc = {});
+        const put = (prop, val) => { if (cache[prop] !== val) { cache[prop] = val; video.style[prop] = val; } };
+        put("transform", `translate3d(calc(-50% + ${x.toFixed(2)}px), calc(-50% + ${y.toFixed(2)}px), 0) scale(${scale.toFixed(4)}) rotateY(${rotateY.toFixed(2)}deg) rotateZ(${rotateZ.toFixed(2)}deg)`);
+        put("opacity", opacity.toFixed(3));
+        put("zIndex", isActive ? "1000" : String(Math.round(front * 100 - distance)));
+        if (smallCard) {
+          // filter + box-shadow force repaints; on phones switch them discretely
+          // (only when the focused card changes) and let opacity/scale carry the motion.
+          put("filter", isActive ? "brightness(1) saturate(.94) contrast(1.05)" : "brightness(.55) saturate(.45) contrast(1.05)");
+          put("boxShadow", isActive ? "0 18px 60px rgba(0,0,0,.42)" : "0 10px 30px rgba(0,0,0,.3)");
+        } else {
+          const brightness = isActive ? 1 : .38 + front * .2;
+          const saturation = isActive ? .94 : .38 + front * .2;
+          const vignette = .56 - front * .38;
+          put("filter", `brightness(${brightness.toFixed(3)}) saturate(${saturation.toFixed(3)}) contrast(1.05)`);
+          put("boxShadow", `inset 0 0 ${Math.round(cardWidth * .08)}px rgba(0, 0, 0, ${vignette.toFixed(3)}), 0 28px 90px rgba(0, 0, 0, ${(.18 + front * .24).toFixed(3)})`);
+        }
         video.classList.toggle("is-active", isActive);
         if (i === step) activeCard = { x, y, scale, ratio: cardRatio };
       });
@@ -574,11 +587,13 @@
         const activeSize = cardWidth * activeCard.ratio * activeCard.scale;
         const activeLeft = activeCard.x - activeSize / 2;
         const activeTop = activeCard.y - activeSize / 2;
-        cycleNum.style.left = `calc(50% + ${(activeLeft + 18).toFixed(2)}px)`;
-        cycleNum.style.top = `calc(50% + ${(activeTop + 18).toFixed(2)}px)`;
-        labelEl.style.left = `calc(50% + ${activeCard.x.toFixed(2)}px)`;
-        labelEl.style.top = `calc(50% + ${(activeCard.y + activeSize / 2 + 12).toFixed(2)}px)`;
-        labelEl.style.bottom = "auto";
+        const place = (el, left, top) => {
+          const c = el.__cyc || (el.__cyc = {});
+          if (c.left !== left) { c.left = left; el.style.left = left; }
+          if (c.top !== top) { c.top = top; el.style.top = top; el.style.bottom = "auto"; }
+        };
+        place(cycleNum, `calc(50% + ${(activeLeft + 18).toFixed(2)}px)`, `calc(50% + ${(activeTop + 18).toFixed(2)}px)`);
+        place(labelEl, `calc(50% + ${activeCard.x.toFixed(2)}px)`, `calc(50% + ${(activeCard.y + activeSize / 2 + 12).toFixed(2)}px)`);
       }
     }
 

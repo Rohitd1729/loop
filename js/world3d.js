@@ -27,7 +27,7 @@
   function makeRenderer(cls) {
     let r;
     try { r = new T.WebGLRenderer({ antialias: true, alpha: true }); } catch (e) { return null; }
-    r.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+    r.setPixelRatio(Math.min(devicePixelRatio || 1, small ? 1.5 : 2));
     r.setSize(innerWidth, innerHeight);
     r.setClearColor(0x000000, 0);
     r.domElement.className = "world3d " + cls;
