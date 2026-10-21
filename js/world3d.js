@@ -16,7 +16,6 @@
   if (document.documentElement.classList.contains("is-lite")) return;
   const T = THREE;
   const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const fine = matchMedia("(hover: hover) and (pointer: fine)").matches;
   const small = innerWidth < 760;
   const $ = (s, el = document) => el.querySelector(s);
   const $$ = (s, el = document) => [...el.querySelectorAll(s)];
@@ -317,21 +316,6 @@
         sprite.visible = side === 1 ? Math.sin(angle) < 0 : Math.sin(angle) >= 0;
       }));
     };
-  }
-
-  /* ---------- 5. cards tilt toward the pointer ---------- */
-  if (fine && !reduced) {
-    let cur = null;
-    const reset = (el) => { el.style.setProperty("--rx", "0deg"); el.style.setProperty("--ry", "0deg"); };
-    document.addEventListener("pointermove", (e) => {
-      const el = e.target.closest && e.target.closest(".pillar, .update, .franchise__panel");
-      if (cur && cur !== el) reset(cur);
-      cur = el;
-      if (!el) return;
-      const r = el.getBoundingClientRect();
-      el.style.setProperty("--ry", (((e.clientX - r.left) / r.width - 0.5) * 10).toFixed(2) + "deg");
-      el.style.setProperty("--rx", (-((e.clientY - r.top) / r.height - 0.5) * 8).toFixed(2) + "deg");
-    });
   }
 
   /* ---------- loop ---------- */

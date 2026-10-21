@@ -411,6 +411,18 @@
     el.innerHTML = words.map((w, i) => `<span class="w" aria-hidden="true"><span style="--i:${i}">${esc(w)}</span></span>`).join(" ");
   });
 
+  // Apple-style statements ([data-lit]): words start dim and light up as the copy scrolls
+  // through view; the per-word classes are updated from onScroll (section 7).
+  const litBlocks = $$("[data-lit]").map((el) => {
+    el.innerHTML = el.textContent.trim().split(/\s+/).map((w) => `<span class="lit-word">${esc(w)}</span>`).join(" ");
+    return { el, words: [...el.children], lit: -1, near: false };
+  });
+  const litIO = new IntersectionObserver((es) => es.forEach((e) => {
+    const b = litBlocks.find((x) => x.el === e.target); if (b) b.near = e.isIntersecting;
+    if (e.isIntersecting) onScroll(); // already on screen at load → light it without waiting for a scroll
+  }), { rootMargin: "25% 0px" });
+  litBlocks.forEach((b) => litIO.observe(b.el));
+
   let io = null;
   function observeReveal(el) { if (io) io.observe(el); } // before startReveals, the initial sweep picks it up
   function startReveals() {
@@ -659,7 +671,7 @@
      7. SCROLL — nav, hero parallax and cycle progress
      ------------------------------------------------------------------------ */
   const nav = $(".nav"), announce = $(".announce"), heroLogo = $(".hero__logo"), heroInner = $(".hero__inner");
-  const storeSection = $("#store"), storeImage = $(".store__img", storeSection);
+  const storeSection = $("#store"), storeImage = $(".store__img", storeSection), storeStage = $(".store__stage", storeSection);
   let lastY = scrollY, velocity = 0;
 
   function onScroll() {
@@ -668,7 +680,17 @@
     const annH = announce ? announce.offsetHeight : 0;
     const cr = cycleEl.getBoundingClientRect();
     const sr = storeSection && storeImage && !reduced ? storeSection.getBoundingClientRect() : null;
+    const lit = litBlocks.filter((b) => b.near).map((b) => [b, b.el.getBoundingClientRect()]);
     velocity += Math.abs(y - lastY);
+
+    // statements light up word by word; fully lit once the block's bottom reaches mid-screen
+    lit.forEach(([b, r]) => {
+      const n = b.words.length;
+      const count = reduced ? n : Math.round(clamp((vh * 0.88 - r.top) / (r.height + vh * 0.38)) * n);
+      if (count === b.lit) return;
+      b.words.forEach((w, i) => w.classList.toggle("is-lit", i < count));
+      b.lit = count;
+    });
     nav.style.top = Math.max(0, annH - y) + "px";
     nav.classList.toggle("is-pinned", y > annH + 10);
     nav.classList.toggle("is-hidden", y > vh * 0.8 && y > lastY && !document.body.classList.contains("menu-open"));
@@ -690,6 +712,12 @@
       const drift = (0.5 - sp) * 34;
       const lift = (0.5 - sp) * 18;
       storeImage.style.transform = `translate3d(${drift.toFixed(1)}px, ${lift.toFixed(1)}px, 0) scale(${(1.04 + sp * 0.12).toFixed(3)})`;
+      // Apple-style expanding media: the photo starts as an inset, rounded frame and opens to
+      // full-bleed as the section rises into place (desktop; phones keep it full-bleed)
+      if (storeStage && !lite) {
+        const q = clamp((vh - sr.top) / (vh * 0.75)), inset = (1 - q) * Math.min(72, innerWidth * 0.06);
+        storeStage.style.clipPath = `inset(${inset.toFixed(1)}px round ${((1 - q) * 28).toFixed(1)}px)`;
+      }
     }
 
   }
@@ -1007,7 +1035,7 @@
   if (!reduced) requestAnimationFrame(frame); else drawCycle(0);
 
   /* ------------------------------------------------------------------------
-     9. MENU, MAGNETIC BUTTONS, PILLAR LIGHT
+     9. MENU, PILLAR LIGHT
      ------------------------------------------------------------------------ */
   const burger = $(".nav__burger"), menu = $(".menu");
   const setMenu = (open) => {
@@ -1021,14 +1049,6 @@
   $$("a", menu).forEach((a) => a.addEventListener("click", () => setMenu(false)));
 
   if (fine && !reduced) {
-    $$(".magnetic").forEach((el) => {
-      el.addEventListener("pointermove", (e) => {
-        const r = el.getBoundingClientRect();
-        el.style.transform = `translate(${(e.clientX - r.left - r.width / 2) * 0.22}px, ${(e.clientY - r.top - r.height / 2) * 0.32}px)`;
-      });
-      el.addEventListener("pointerleave", () => { el.style.transform = ""; });
-      el.style.transition = "transform .5s cubic-bezier(.2,.7,.1,1), color .45s";
-    });
     $$(".pillar").forEach((el) => el.addEventListener("pointermove", (e) => {
       const r = el.getBoundingClientRect();
       el.style.setProperty("--mx", e.clientX - r.left + "px");

@@ -12,7 +12,7 @@
 window.LOOP_CONTENT = {
 
   hero: {
-    eyebrow: "The Robotic Laundry Revolution",
+    eyebrow: "The robotic laundry revolution",
     tagline: "The Fabric Future",
     /* Looping video shown inside the first O of the big logo (black background, square).
        Replace the file to change the animation; set to "" for a plain ring. */

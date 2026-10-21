@@ -763,7 +763,7 @@ body:not(.is-loading) .preloader { clip-path: inset(0 0 100% 0); visibility: hid
 /* ================================================================
    Refinements: layout (taste) + feel (Apple fluid-interface rules)
    ================================================================ */
-/* instant feedback on press; `scale` composes with the magnetic/tilt transforms */
+/* instant feedback on press; `scale` composes with any transform already on the element */
 .btn:active, .round:active, .chip:active span { scale: .97; transition: scale 90ms ease-out; }
 .update:active, .service:active { scale: .99; transition: scale 90ms ease-out; }
 
@@ -1354,3 +1354,108 @@ body { position: relative; }
 /* the globe's leader lines redraw every frame: give them their own layer so the backdrop photo
    and its gradient masks underneath aren't repainted with them */
 .network-connector { will-change: transform; }
+
+/* ==========================================================================
+   Apple-style type & motion
+   Type: SF Pro on Apple devices (the system font, with automatic optical sizes); Inter
+   everywhere else — self-hosted, variable weight + optical size. Semibold headlines with
+   size-specific tracking (tighter as they grow), 17px body, sentence-case semibold labels
+   instead of monospace caps.
+   Motion: calm fade-and-rise reveals, statements that light up as you scroll, media that
+   expands to full-bleed; hovers are simple colour shifts — no cursor-chasing buttons,
+   tilting cards, colour wipes or growing padding.
+   ========================================================================== */
+@font-face {
+  font-family: "Inter LOOP"; font-style: normal; font-weight: 100 900; font-display: swap;
+  src: url("../assets/fonts/inter-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face { /* latin-ext — includes the rupee sign used in the franchise figures */
+  font-family: "Inter LOOP"; font-style: normal; font-weight: 100 900; font-display: swap;
+  src: url("../assets/fonts/inter-latin-ext.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+:root {
+  --f-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter LOOP", "Segoe UI", system-ui, sans-serif;
+  --f-body: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter LOOP", "Segoe UI", system-ui, sans-serif;
+  --fs-body: 17px;
+  --lh-body: 1.47;
+}
+body { letter-spacing: -0.01em; font-optical-sizing: auto; text-rendering: optimizeLegibility; }
+
+/* headlines: semibold, tracking tightens as size grows, tight leading */
+h1, h2, h3, .h2 { font-weight: 600; }
+.h2 { font-size: clamp(36px, 4.8vw, 64px); line-height: 1.06; letter-spacing: -0.028em; }
+.hero__headline, .global-network__content h2, .contact__title, .cycle__steps h3, .pillar h3,
+.service h3, .update h3, .article__title, .store__caption .h2, .menu a { font-weight: 600; }
+.hero__headline { line-height: 1.1; letter-spacing: -0.02em; }
+.global-network__content h2 { line-height: 1.04; letter-spacing: -0.032em; }
+.contact__title { line-height: .95; letter-spacing: -0.042em; }
+.cycle__steps h3, .pillar h3, .update h3 { letter-spacing: -0.018em; }
+.service h3 { letter-spacing: -0.026em; }
+.article__title { letter-spacing: -0.03em; }
+.stat strong, .figure strong { font-weight: 600; letter-spacing: -0.038em; font-variant-numeric: tabular-nums; }
+.marquee__track span { font-weight: 600; letter-spacing: -0.026em; color: var(--text-dim); }
+.hero__tagline { font-weight: 400; }
+
+/* body copy: near-zero tracking, comfortable leading; "intro" copy one step up */
+.hero__sub, .global-network__intro, .franchise__lead, .store__text, .cycle__steps p, .pillar p, .service p, .update p { letter-spacing: -0.012em; }
+.hero__sub { font-size: clamp(17px, 1.3vw, 21px); line-height: 1.42; }
+
+/* labels: sentence-case semibold (Apple's eyebrow), not monospace caps */
+.mono { font-family: var(--f-body); font-size: 12px; font-weight: 600; letter-spacing: -0.005em; text-transform: none; font-variant-numeric: tabular-nums; }
+.eyebrow {
+  font-family: var(--f-body); font-size: clamp(17px, 1.35vw, 21px); font-weight: 600; letter-spacing: -0.012em;
+  text-transform: none; color: var(--brass); gap: 0; margin-bottom: 14px;
+}
+.eyebrow::before, .hero__eyebrow::after { display: none; }
+.franchise .eyebrow { color: #8a6d3b; }
+.announce { font-family: var(--f-body); font-size: 13px; letter-spacing: -0.01em; text-transform: none; }
+.preloader__meta { font-family: var(--f-body); font-size: 12px; font-weight: 600; letter-spacing: 0; text-transform: none; font-variant-numeric: tabular-nums; }
+.cycle__steps li::before { font-family: var(--f-body); font-size: 12px; font-weight: 600; letter-spacing: 0; font-variant-numeric: tabular-nums; }
+.cycle__label { font-size: 14px; font-weight: 600; letter-spacing: -0.01em; }
+.franchise__list li span, .contact__socials a small { font-family: var(--f-body); font-size: 12px; font-weight: 600; letter-spacing: 0; text-transform: none; }
+.store__steps { font-size: clamp(15px, 1.2vw, 17px); font-weight: 400; letter-spacing: -0.01em; }
+.store__steps li { font-size: inherit; letter-spacing: inherit; }
+.store__steps li span { font-weight: 600; }
+.update__more { font-size: 15px; font-weight: 400; color: var(--brass); }
+.city-card__meta { font-size: 11px; letter-spacing: 0; }
+/* the hero holograms and HUD read as technical drawings: they keep their monospace caps */
+.city__label, .hero__hud { font-family: var(--f-mono); text-transform: uppercase; font-weight: 400; }
+.city__label { font-size: 9px; letter-spacing: .16em; }
+.hero__hud { font-size: 11px; letter-spacing: .14em; }
+
+/* nav: compact Apple-style bar */
+.nav__links { font-size: 14px; letter-spacing: -0.01em; gap: 28px; }
+.nav__links a { color: rgba(236, 231, 223, .78); }
+.nav.is-pinned { background: rgba(18, 18, 18, .72); backdrop-filter: saturate(180%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px); }
+
+/* buttons: Apple pills — no colour wipe; the fill simply brightens on hover */
+.btn { font-size: 17px; font-weight: 400; letter-spacing: -0.01em; padding: 12px 22px; gap: 10px; transition: background-color .2s var(--ease), color .2s var(--ease), border-color .2s var(--ease); }
+.btn::before { display: none; }
+.btn--small { font-size: 13px; padding: 7px 15px; }
+.btn:hover, .btn--ghost:hover { color: var(--fg); }
+.btn i { transition: transform .2s var(--ease); }
+.btn:hover i { transform: none; }
+/* services: no paper wipe or growing padding (that animated layout) */
+.service { transition: color .2s var(--ease); }
+.service::before { display: none; }
+.service:hover { color: inherit; padding-left: 0; padding-right: 0; }
+.service:hover p, .service:hover .service__n { color: var(--text-dim); }
+@media (hover: hover) and (pointer: fine) {
+  .btn:hover { background: #fff; }
+  .btn--ghost:hover { background: rgba(236, 231, 223, .1); border-color: rgba(236, 231, 223, .5); }
+  .btn:hover i { transform: translateX(3px); }
+  .service:hover h3 { color: #fff; }
+}
+
+/* reveals: a calm fade-and-rise per word (no masked slide) and for blocks */
+.split .w { overflow: visible; }
+.split .w > span { opacity: 0; transform: translateY(.35em); transition: transform 1s var(--ease), opacity .9s var(--ease); transition-delay: calc(var(--i) * 28ms); }
+.split.in .w > span { opacity: 1; transform: none; }
+.reveal { transform: translateY(28px); transition: opacity .9s var(--ease), transform 1s var(--ease); transition-delay: calc(var(--i, 0) * 70ms); }
+
+/* statements that light up word by word as they scroll through view (main.js: [data-lit]) */
+.lit-word { opacity: .2; transition: opacity .45s var(--ease); }
+.lit-word.is-lit { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .lit-word { opacity: 1; } }
