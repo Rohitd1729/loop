@@ -544,7 +544,7 @@ body:not(.is-loading) .preloader { clip-path: inset(0 0 100% 0); visibility: hid
 .updates { padding: var(--section-space) 0 clamp(72px, 8vw, 104px); }
 .updates__nav { display: flex; gap: 10px; }
 .updates__rail {
-  display: grid; grid-auto-flow: column; grid-auto-columns: minmax(300px, 400px); gap: 24px; overflow-x: auto;
+  display: grid; grid-auto-flow: column; grid-auto-columns: clamp(300px, 26vw, 420px); gap: 24px; overflow-x: auto;
   padding: 0 var(--gutter) 24px; scroll-snap-type: x mandatory; scroll-padding: 0 var(--gutter); scrollbar-width: none;
 }
 .updates__rail::-webkit-scrollbar { display: none; }
@@ -905,7 +905,12 @@ input, textarea, select { font-size: 16px; }
 }
 
 .contact__info a, .footer__cities, .footer__values, .footer__line { overflow-wrap: anywhere; }
-.updates__rail { touch-action: pan-y; overscroll-behavior-x: contain; }
+/* pan-x must stay allowed or phones/tablets can't swipe the rail sideways; position makes the
+   rail the cards' offsetParent so the snap points (js/main.js) are measured inside it */
+.updates__rail { position: relative; touch-action: pan-x pan-y; overscroll-behavior-x: contain; overflow-y: hidden; padding-top: 10px; }
+/* overflow-y: hidden — otherwise the rail is also a (20px) vertical scroller and swallows
+   vertical swipes that start on a card, so the page can't scroll past the section */
+.updates__nav .round:disabled { opacity: .22; cursor: default; pointer-events: none; }
 
 @media (min-width: 761px) and (max-width: 1020px) {
   .franchise__grid, .contact__grid {

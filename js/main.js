@@ -241,6 +241,7 @@
     const rail = $(".updates__rail");
     if (!updates.length) {
       rail.innerHTML = `<div class="updates__empty"><span class="mono">Nothing posted yet</span><p>News from LOOP (store openings, offers, franchise updates) will appear here.</p></div>`;
+      requestAnimationFrame(updateRailNav);
       return;
     }
     rail.innerHTML = updates.map((u, i) => {
@@ -254,7 +255,21 @@
           ${more ? `<button class="update__more mono" type="button">Read more <span>→</span></button>` : ""}
         </div></article>`;
     }).join("");
-    $$(".update", rail).forEach(observeReveal);
+    // Reveal the whole rail at once (staggered by --i) when it scrolls into view. Per-card
+    // reveals left cards beyond the right edge transparent, hiding the "swipe for more" peek.
+    const railIO = new IntersectionObserver(([e]) => {
+      if (!e.isIntersecting) return;
+      $$(".update", rail).forEach((c) => c.classList.add("in"));
+      railIO.disconnect();
+    }, { threshold: .15 });
+    railIO.observe(rail);
+    requestAnimationFrame(updateRailNav);
+  }
+
+  // Arrows dim at either end of the rail (both dim when every card already fits).
+  function updateRailNav() {
+    const r = $(".updates__rail"), max = r.scrollWidth - r.clientWidth;
+    $$(".updates__nav button").forEach((b) => { b.disabled = +b.dataset.dir < 0 ? r.scrollLeft <= 2 : r.scrollLeft >= max - 2; });
   }
 
   // Full article view
@@ -319,8 +334,10 @@
     let x = rail.scrollLeft + railDrag.over, v = v0, last = performance.now();
     rail.style.scrollSnapType = "none";
     (function step(now) {
-      const dt = Math.min(0.032, (now - last) / 1000); last = now;
-      v += (-k * (x - goal) - c * v) * dt; x += v * dt;
+      // integrate in small fixed steps over the real elapsed time, so a slow frame
+      // never slows the motion down (the old per-frame cap made it crawl at low fps)
+      let left = Math.min(0.1, (now - last) / 1000); last = now;
+      while (left > 0) { const dt = Math.min(0.008, left); left -= dt; v += (-k * (x - goal) - c * v) * dt; x += v * dt; }
       setOver(x < 0 ? x : x > max ? x - max : 0);
       rail.scrollLeft = clamp(x, 0, max);
       if (Math.abs(x - goal) > 0.5 || Math.abs(v) > 5) railDrag.raf = requestAnimationFrame(step);
@@ -361,6 +378,8 @@
     const list = snaps(), here = list.indexOf(nearest(rail.scrollLeft));
     springTo(list[clamp(here + +b.dataset.dir, 0, list.length - 1)] ?? 0, 0);
   }));
+  rail.addEventListener("scroll", updateRailNav, { passive: true });
+  addEventListener("resize", updateRailNav);
 
   // Contact
   const ct = C.contact || {};
