@@ -11,6 +11,7 @@ const required = [
   "js/main.js",
   "js/globe.js",
   "js/network.js",
+  "js/doodles.js",
   "js/world3d.js",
   "content/updates.json",
   "assets/globe-countries.json"
@@ -30,6 +31,7 @@ const jsFiles = [
   "js/main.js",
   "js/globe.js",
   "js/network.js",
+  "js/doodles.js",
   "js/world3d.js"
 ];
 
